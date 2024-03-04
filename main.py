@@ -1,11 +1,53 @@
+import sys
 import os
 import json
+from msvcrt import getch
 
 
 class KeyCodes:
     ENTER = 10
     BACKSPACE = 8
     CTRL_BACKSPACE = 127
+
+
+class Term:
+    clear_code = '\033[2J'
+    reset_pos_code = '\033[H'
+    hide_cursor_code = '\033[?25l'
+    show_cursor_code = '\033[?25h'
+
+    width, height = os.get_terminal_size()
+    in_width, in_height = width - 2, height - 2
+    buffer = [' ' * width] * height
+    align_center = False
+
+    @staticmethod
+    def clear():
+        title = 'Trans Dictionary'
+        Term.buffer = ['│' + ' ' * Term.in_width + '│'] * Term.height
+        Term.buffer[0] = '╭' + f'┐{title}┌'.center(Term.in_width, '─') + '╮'
+        Term.buffer[Term.height - 1] = '╰' + '─' * Term.in_width + '╯'
+
+    @staticmethod
+    def draw():
+        print(Term.clear_code + Term.reset_pos_code + Term.hide_cursor_code + '\n'.join(Term.buffer))
+
+
+class Color:
+    std_colors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'default']
+    code = {
+        'full_reset': '\033[0m',
+        'fg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(30, 38)) + [39]))),
+        'bg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(40, 48)) + [49]))),
+        'bfg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(90, 98)) + [99]))),
+        'bbg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(100, 108)) + [109]))),
+    }
+
+    @staticmethod
+    def hex2sgr(color: str, background: bool = False):
+        color = color.lstrip('#')
+        r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
+        return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
 
 
 class Border:
@@ -24,50 +66,6 @@ class Border:
     ARC_TL = '╯'  # '\u256f'
     ARC_TR = '╰'  # '\u2570'
 
-    @staticmethod
-    def draw():
-        title = 'Trans Dictionary'
-        screen.addch(0, 0, Border.ARC_BR)
-        screen.addch(0, edge_x - 1, Border.ARC_BL)
-        screen.addch(edge_y - 1, 0, Border.ARC_TR)
-        try:
-            screen.addch(edge_y - 1, edge_x - 1, Border.ARC_TL)
-        except curses.error:
-            pass
-        title_start_index = edge_x // 2 - len(title) // 2
-        for x in list(range(1, title_start_index - 1)) + list(range(title_start_index + len(title) + 1, edge_x - 1)):
-            screen.addstr(0, x, Border.HORIZ)
-        for x in range(1, edge_x - 1):
-            screen.addstr(edge_y - 1, x, Border.HORIZ)
-        for y in range(1, edge_y - 1):
-            screen.addstr(y, 0, Border.VERT)
-            screen.addstr(y, edge_x - 1, Border.VERT)
-        screen.addstr(0, title_start_index - 1, Border.CORNER_BL + title + Border.CORNER_BR)
-
-
-class Term:
-    clear = '\033[2J'
-    reset_pos = '\033[H'
-    hide_cursor = '\033[?25l'
-    show_cursor = '\033[?25h'
-    width, height = os.get_terminal_size()
-
-    class Color:
-        std_colors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'default']
-        code = {
-            'full_reset': '\033[0m',
-            'fg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(30, 38)) + [39]))),
-            'bg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(40, 48)) + [49]))),
-            'bfg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(90, 98)) + [99]))),
-            'bbg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(100, 108)) + [109]))),
-        }
-
-        @staticmethod
-        def hex2term(color: str, background: bool = False):
-            color = color.lstrip('#')
-            r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
-            return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
-
 
 MENU = [
     '╭─────────────┬─────────────╮',  # 0
@@ -78,27 +76,13 @@ MENU = [
     '│          [Enter]          │',  # 5
     '╰───────────────────────────╯'   # 6
 ]
-MENU[2] = MENU[2].replace('[A]', TermColor.code['fg']['green'] + '[A]' + TermColor.code['fg']['default'])
-MENU[2] = MENU[2].replace('[S]', TermColor.code['fg']['green'] + '[S]' + TermColor.code['fg']['default'])
-MENU[5] = MENU[5].replace('[Enter]', TermColor.code['fg']['green'] + '[Enter]' + TermColor.code['fg']['default'])
+MENU[2] = MENU[2].replace('[A]', Color.code['fg']['green'] + '[A]' + Color.code['fg']['default'])
+MENU[2] = MENU[2].replace('[S]', Color.code['fg']['green'] + '[S]' + Color.code['fg']['default'])
+MENU[5] = MENU[5].replace('[Enter]', Color.code['fg']['green'] + '[Enter]' + Color.code['fg']['default'])
 
 with open("db.json", "r") as db_file:
     db = json.load(db_file)
 
-s = ''
-c = ''
-while s != 'q':
-    screen.clear()
-    Border.draw()
-    for menu_y, menu_line in enumerate(MENU):
-        screen.addstr(edge_y // 2 - len(MENU) // 2 + menu_y, edge_x // 2 - len(menu_line) // 2, menu_line)
-    c = screen.getch()
-    if c == KeyCodes.BACKSPACE:
-        if len(s) > 0:
-            s = s[:-1]
-    else:
-        s += chr(c)
-    for line in MENU:
-        print(line)
-
-curses.endwin()
+os.system('cls' if os.name == 'nt' else 'clear')
+Term.clear()
+Term.draw()
