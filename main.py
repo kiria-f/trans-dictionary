@@ -1,8 +1,5 @@
+import os
 import json
-import curses
-
-screen = curses.initscr()
-edge_y, edge_x = screen.getmaxyx()
 
 
 class KeyCodes:
@@ -48,21 +45,45 @@ class Border:
         screen.addstr(0, title_start_index - 1, Border.CORNER_BL + title + Border.CORNER_BR)
 
 
-MENU = (
-    '╭─────────────┬─────────────╮',
-    '│  Add Phrase │   Search    │',
-    '│     [A]     │     [S]     │',
-    '├─────────────┴─────────────┤',
-    '│            Run            │',
-    '│          [Enter]          │',
-    '╰───────────────────────────╯'
-)
+class Term:
+    clear = '\033[2J'
+    reset_pos = '\033[H'
+    hide_cursor = '\033[?25l'
+    show_cursor = '\033[?25h'
+    width, height = os.get_terminal_size()
+
+    class Color:
+        std_colors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'default']
+        code = {
+            'full_reset': '\033[0m',
+            'fg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(30, 38)) + [39]))),
+            'bg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(40, 48)) + [49]))),
+            'bfg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(90, 98)) + [99]))),
+            'bbg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(100, 108)) + [109]))),
+        }
+
+        @staticmethod
+        def hex2term(color: str, background: bool = False):
+            color = color.lstrip('#')
+            r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
+            return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
+
+
+MENU = [
+    '╭─────────────┬─────────────╮',  # 0
+    '│  Add Phrase │   Search    │',  # 1
+    '│     [A]     │     [S]     │',  # 2
+    '├─────────────┴─────────────┤',  # 3
+    '│            Run            │',  # 4
+    '│          [Enter]          │',  # 5
+    '╰───────────────────────────╯'   # 6
+]
+MENU[2] = MENU[2].replace('[A]', TermColor.code['fg']['green'] + '[A]' + TermColor.code['fg']['default'])
+MENU[2] = MENU[2].replace('[S]', TermColor.code['fg']['green'] + '[S]' + TermColor.code['fg']['default'])
+MENU[5] = MENU[5].replace('[Enter]', TermColor.code['fg']['green'] + '[Enter]' + TermColor.code['fg']['default'])
 
 with open("db.json", "r") as db_file:
     db = json.load(db_file)
-
-curses.noecho()
-curses.curs_set(0)
 
 s = ''
 c = ''
@@ -77,5 +98,7 @@ while s != 'q':
             s = s[:-1]
     else:
         s += chr(c)
+    for line in MENU:
+        print(line)
 
 curses.endwin()
