@@ -19,7 +19,6 @@ class Term:
     width, height = os.get_terminal_size()
     in_width, in_height = width - 2, height - 2
     buffer = [' ' * width] * height
-    align_center = False
 
     @staticmethod
     def clear():
@@ -31,6 +30,20 @@ class Term:
     @staticmethod
     def draw():
         print(Term.reset_pos_code, Term.hide_cursor_code, '\n'.join(Term.buffer), sep='', end='')
+
+    @staticmethod
+    def insert(text: tuple[tuple[str, int]] | list[tuple[str, int]], y: int = -1, align_center: bool = False):
+        if y == -1:
+            y = (Term.in_height - len(text)) // 2
+        for i in range(len(text)):
+            line = text[i][0]
+            line_width = text[i][1]
+            if align_center:
+                x = (Term.in_width - line_width) // 2
+                line = ' ' * x + line + ' ' * (Term.in_width - x - line_width)
+            else:
+                line += ' ' * (Term.in_width - line_width)
+            Term.buffer[y + i] = '│' + line + '│'
 
 
 class Color:
@@ -79,11 +92,13 @@ MENU = [
 MENU[2] = MENU[2].replace('[A]', Color.code['fg']['green'] + '[A]' + Color.code['fg']['default'])
 MENU[2] = MENU[2].replace('[S]', Color.code['fg']['green'] + '[S]' + Color.code['fg']['default'])
 MENU[5] = MENU[5].replace('[Enter]', Color.code['fg']['green'] + '[Enter]' + Color.code['fg']['default'])
+MENU = list(map(lambda x: (x, 29), MENU))
 
 with open("db.json", "r") as db_file:
     db = json.load(db_file)
 
 Term.clear()
+Term.insert(MENU, align_center=True)
 Term.draw()
 getch()
 os.system('cls' if os.name == 'nt' else 'clear')
