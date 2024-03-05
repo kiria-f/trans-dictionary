@@ -11,7 +11,7 @@ class KeyCodes:
 
 
 class Term:
-    clear_code = '\033[2J'
+    clear_code = '\033[1J'
     reset_pos_code = '\033[H'
     hide_cursor_code = '\033[?25l'
     show_cursor_code = '\033[?25h'
@@ -30,7 +30,7 @@ class Term:
 
     @staticmethod
     def draw():
-        print(Term.clear_code + Term.reset_pos_code + Term.hide_cursor_code + '\n'.join(Term.buffer))
+        print(Term.reset_pos_code, Term.hide_cursor_code, '\n'.join(Term.buffer), sep='', end='')
 
 
 class Color:
@@ -83,6 +83,7 @@ MENU[5] = MENU[5].replace('[Enter]', Color.code['fg']['green'] + '[Enter]' + Col
 with open("db.json", "r") as db_file:
     db = json.load(db_file)
 
-os.system('cls' if os.name == 'nt' else 'clear')
 Term.clear()
 Term.draw()
+getch()
+os.system('cls' if os.name == 'nt' else 'clear')
