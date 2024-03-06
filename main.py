@@ -74,17 +74,44 @@ class Term:
 
 
 class Color:
-    std_colors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white', 'default']
-    code = {
-        'full_reset': '\033[0m',
-        'fg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(30, 38)) + [39]))),
-        'bg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(40, 48)) + [49]))),
-        'bfg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(90, 98)) + [99]))),
-        'bbg': dict(zip(std_colors, map(lambda x: f'\033[{x}m', list(range(100, 108)) + [109]))),
-    }
+    BOLD = '\033[1m'
+    BLACK = '\033[30m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    MAGENTA = '\033[35m'
+    CYAN = '\033[36m'
+    WHITE = '\033[37m'
+    DEFAULT = '\033[39m'
+    BLACK_BG = '\033[40m'
+    RED_BG = '\033[41m'
+    GREEN_BG = '\033[42m'
+    YELLOW_BG = '\033[43m'
+    BLUE_BG = '\033[44m'
+    MAGENTA_BG = '\033[45m'
+    CYAN_BG = '\033[46m'
+    WHITE_BG = '\033[47m'
+    DEFAULT_BG = '\033[49m'
+    BRIGHT_BLACK = '\033[90m'
+    BRIGHT_RED = '\033[91m'
+    BRIGHT_GREEN = '\033[92m'
+    BRIGHT_YELLOW = '\033[93m'
+    BRIGHT_BLUE = '\033[94m'
+    BRIGHT_MAGENTA = '\033[95m'
+    BRIGHT_CYAN = '\033[96m'
+    BRIGHT_WHITE = '\033[97m'
+    BRIGHT_BLACK_BG = '\033[100m'
+    BRIGHT_RED_BG = '\033[101m'
+    BRIGHT_GREEN_BG = '\033[102m'
+    BRIGHT_YELLOW_BG = '\033[103m'
+    BRIGHT_BLUE_BG = '\033[104m'
+    BRIGHT_MAGENTA_BG = '\033[105m'
+    BRIGHT_CYAN_BG = '\033[106m'
+    BRIGHT_WHITE_BG = '\033[107m'
 
     @staticmethod
-    def hex2sgr(color: str, background: bool = False):
+    def from_hex(color: str, background: bool = False):
         color = color.lstrip('#')
         r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
         return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
@@ -133,15 +160,16 @@ MENU = [
     '│          [Enter]          │',  # 5
     '╰───────────────────────────╯'  # 6
 ]
-MENU[2] = MENU[2].replace('[A]', Color.code['fg']['green'] + '[A]' + Color.code['fg']['default'])
-MENU[2] = MENU[2].replace('[S]', Color.code['fg']['green'] + '[S]' + Color.code['fg']['default'])
-MENU[5] = MENU[5].replace('[Enter]', Color.code['fg']['green'] + '[Enter]' + Color.code['fg']['default'])
+MENU[2] = MENU[2].replace('[A]', Color.GREEN + '[A]' + Color.DEFAULT)
+MENU[2] = MENU[2].replace('[S]', Color.GREEN + '[S]' + Color.DEFAULT)
+MENU[5] = MENU[5].replace('[Enter]', Color.GREEN + '[Enter]' + Color.DEFAULT)
 MENU = list(map(lambda x: (x, 29), MENU))
 
 with open("db.json", "r") as db_file:
     db = json.load(db_file)
 
 os.system('cls' if os.name == 'nt' else 'clear')
+
 State.state = State.Enum.MENU
 c = b"'"
 Term.clear()
@@ -149,21 +177,21 @@ Term.insert(MENU, align_center=True)
 while State.state != State.Enum.QUIT:
     Term.draw()
     c = getch()
-
     Term.clear()
-    if State.state == State.Enum.MENU:
-        Term.insert(MENU, align_center=True)
+
     if State.state == State.Enum.MENU:
         if c == b'a':
-            # State.state = State.Enum.ADD
-            Term.insert('add', -2)
+            State.state = State.Enum.ADD
         elif c == b's':
-            # State.state = State.Enum.SEARCH
-            Term.insert('search', -2)
+            State.state = State.Enum.SEARCH
         elif c == b'\r':
-            # State.state = State.Enum.SCROLL
-            Term.insert('scroll', -2)
-        if c == b'q':
+            State.state = State.Enum.SCROLL
+        elif c == b'q':
             State.state = State.Enum.QUIT
+        else:
+            Term.insert(MENU, align_center=True)
+            token = str(c)[2:-1]
+            text = f'{Color.RED}Unknown: {Color.BRIGHT_BLACK}[{Color.DEFAULT}{token}{Color.BRIGHT_BLACK}]{Color.DEFAULT}'
+            Term.insert((text, 12), -2, True)
 
 os.system('cls' if os.name == 'nt' else 'clear')
