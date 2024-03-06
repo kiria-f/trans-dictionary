@@ -1,4 +1,3 @@
-import sys
 import os
 import json
 from typing import NewType, Union
@@ -37,8 +36,7 @@ class Term:
         print(Term.reset_pos_code, Term.hide_cursor_code, '\n'.join(Term.buffer), sep='', end='')
 
     @staticmethod
-    def _prepare_text(
-            text: insertion_any_form):
+    def _prepare_text(text: insertion_any_form):
         if isinstance(text, str):
             return ((text, len(text)),)
         if isinstance(text, tuple) and len(text) == 2 and isinstance(text[1], int):
@@ -54,9 +52,7 @@ class Term:
         return []
 
     @staticmethod
-    def insert(
-            text: insertion_any_form,
-            y: int | None = None, align_center: bool = False):
+    def insert(text: insertion_any_form, y: int | None = None, align_center: bool = False):
         text = Term._prepare_text(text)
         if y is None:
             y = (Term.in_height - len(text)) // 2
@@ -165,33 +161,39 @@ MENU[2] = MENU[2].replace('[S]', Color.GREEN + '[S]' + Color.DEFAULT)
 MENU[5] = MENU[5].replace('[Enter]', Color.GREEN + '[Enter]' + Color.DEFAULT)
 MENU = list(map(lambda x: (x, 29), MENU))
 
-with open("db.json", "r") as db_file:
-    db = json.load(db_file)
 
-os.system('cls' if os.name == 'nt' else 'clear')
+def main():
+    with open("db.json", "r") as db_file:
+        db = json.load(db_file)
 
-State.state = State.Enum.MENU
-c = b"'"
-Term.clear()
-Term.insert(MENU, align_center=True)
-while State.state != State.Enum.QUIT:
-    Term.draw()
-    c = getch()
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+    State.state = State.Enum.MENU
+    c = b"'"
     Term.clear()
+    Term.insert(MENU, align_center=True)
+    while State.state != State.Enum.QUIT:
+        Term.draw()
+        c = getch()
+        Term.clear()
 
-    if State.state == State.Enum.MENU:
-        if c == b'a':
-            State.state = State.Enum.ADD
-        elif c == b's':
-            State.state = State.Enum.SEARCH
-        elif c == b'\r':
-            State.state = State.Enum.SCROLL
-        elif c == b'q':
-            State.state = State.Enum.QUIT
-        else:
-            Term.insert(MENU, align_center=True)
-            token = str(c)[2:-1]
-            text = f'{Color.RED}Unknown: {Color.BRIGHT_BLACK}[{Color.DEFAULT}{token}{Color.BRIGHT_BLACK}]{Color.DEFAULT}'
-            Term.insert((text, 12), -2, True)
+        if State.state == State.Enum.MENU:
+            if c == b'a':
+                State.state = State.Enum.ADD
+            elif c == b's':
+                State.state = State.Enum.SEARCH
+            elif c == b'\r':
+                State.state = State.Enum.SCROLL
+            elif c == b'q':
+                State.state = State.Enum.QUIT
+            else:
+                Term.insert(MENU, align_center=True)
+                token = str(c)[2:-1]
+                text = f'{Color.RED}Unknown: {Color.BRIGHT_BLACK}[{Color.DEFAULT}{token}{Color.BRIGHT_BLACK}]{Color.DEFAULT}'
+                Term.insert((text, 12), -2, True)
 
-os.system('cls' if os.name == 'nt' else 'clear')
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
+if __name__ == '__main__':
+    main()
