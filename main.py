@@ -149,7 +149,7 @@ class State:
         REVERSE = 1
 
     state = Enum.MENU
-    parameters = ()
+    parameter = None
     input = ''
     scroll_mode = ScrollMode.STRAIGHT
 
@@ -178,16 +178,17 @@ class LogicBlock:
         self.handler = handler
 
 
-def menu_print(message: None | tuple[str, int] = None):
+def menu_print():
     Term.insert(MENU, align_center=True)
-    if message is not None:
-        Term.insert(message, -2, True)
+    if State.parameter is not None:
+        Term.insert(State.parameter, -2, True)
 
 
-def menu_handle(c: bytes | None = None):
+def menu_handle(c: bytes):
     if State.state == State.Enum.MENU:
         if c == b'a':
             State.state = State.Enum.ADD
+            State.parameter = ''
         elif c == b's':
             State.state = State.Enum.SEARCH
         elif c == b'\r':
@@ -202,23 +203,50 @@ def menu_handle(c: bytes | None = None):
                        Style.DEFAULT + token +
                        Style.BRIGHT_BLACK + ']' +
                        Style.DEFAULT)
-            State.parameters = (message, 11 + len(token))
+            State.parameter = (message, 11 + len(token))
+
+
+def add_print():
+    Term.insert('  ⮞ ' + State.parameter, y=-3)
+    tip = '    ' + Style.MAGENTA + 'Phrase'[:len(State.parameter)]
+    if ' - ' in State.parameter:
+        if len(State.parameter) < 9:
+            tip = tip[:5] + '…'
+        tip += '   '
+        tip += Style.GREEN + 'Translation'[:len(State.parameter) - 9]
+    tip += Style.DEFAULT
+    Term.insert(tip, y=-2)
+
+
+def add_handle(c: bytes):
+    if c == b"'":
+        State.state = State.Enum.MENU
+        State.parameter = None
+    elif c == b'\r':
+        State.state = State.Enum.MENU
+        State.parameter = None
+    elif c == b'\b':
+        if State.parameter:
+            State.parameter = State.parameter[:-1]
+    else:
+        State.parameter += str(c)[2:-1]
 
 
 def main():
-    with open("db.json", "r") as db_file:
+    with open('db.json', 'r') as db_file:
         db = json.load(db_file)
     if not DEBUG:
         os.system('cls' if os.name == 'nt' else 'clear')
     logic = {
         State.Enum.MENU: LogicBlock(menu_print, menu_handle),
+        State.Enum.ADD: LogicBlock(add_print, add_handle),
     }
 
     State.state = State.Enum.MENU
     State.next_call = lambda: menu_print()
     Term.reset()
     while State.state != State.Enum.QUIT:
-        logic[State.state].printer(State.parameters)
+        logic[State.state].printer()
         Term.draw()
         logic[State.state].handler(getch())
         Term.reset()
