@@ -200,9 +200,10 @@ class State:
         REVERSE = 1
 
     state = Enum.MENU
-    parameter = None
+    parameter: None | str = None
     input = ''
     scroll_mode = ScrollMode.STRAIGHT
+    db: dict[str, str] = {}
 
 
 MENU = [
@@ -274,22 +275,32 @@ def add_handle(c: bytes):
         State.state = State.Enum.MENU
         State.parameter = None
     elif c == b'\r':
+        if ' - ' in State.parameter:
+            key, val = State.parameter.split(' - ', 1)
+            State.db[key] = val
+            with open('db.json', 'w') as db_file:
+                json.dump(State.db, db_file)
         State.state = State.Enum.MENU
         State.parameter = None
     elif c == b'\b':
         if State.parameter:
             State.parameter = State.parameter[:-1]
     else:
-        cs = str(c)[2:-1]
+        cs = str(c)[2:-1].lower()
         if ' - ' in State.parameter and cs in en2ru:
-            State.parameter += en2ru[cs]
+            if State.parameter.index(' - ') == len(State.parameter) - 3:
+                State.parameter += en2ru[cs].upper()
+            else:
+                State.parameter += en2ru[cs]
         else:
+            if len(State.parameter) == 0:
+                cs = cs.upper()
             State.parameter += cs
 
 
 def main():
     with open('db.json', 'r') as db_file:
-        db = json.load(db_file)
+        State.db = json.load(db_file)
     if not DEBUG:
         os.system('cls' if os.name == 'nt' else 'clear')
     logic = {
