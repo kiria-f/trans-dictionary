@@ -15,6 +15,55 @@ insertion_any_form = NewType('insertion_any_form', Union[
 
 insertion = NewType('insertion', list[tuple[str, int]])
 
+en2ru = {
+    '`': 'ё',
+    'q': 'й',
+    'w': 'ц',
+    'e': 'у',
+    'r': 'к',
+    't': 'е',
+    'y': 'н',
+    'u': 'г',
+    'i': 'ш',
+    'o': 'щ',
+    'p': 'з',
+    '[': 'х',
+    ']': 'ъ',
+    'a': 'ф',
+    's': 'ы',
+    'd': 'в',
+    'f': 'а',
+    'g': 'п',
+    'h': 'р',
+    'j': 'о',
+    'k': 'л',
+    'l': 'д',
+    ';': 'ж',
+    "'": 'э',
+    'z': 'я',
+    'x': 'ч',
+    'c': 'с',
+    'v': 'м',
+    'b': 'и',
+    'n': 'т',
+    'm': 'ь',
+    ',': 'б',
+    '.': 'ю',
+}
+
+
+def visible_len(line: str):
+    vl = 0
+    i = 0
+    while i < len(line):
+        if line[i] == '\033':
+            while line[i] != 'm':
+                i += 1
+        else:
+            vl += 1
+        i += 1
+    return vl
+
 
 class Term:
     clear_code = '\033[1J'
@@ -43,14 +92,14 @@ class Term:
     @staticmethod
     def _prepare_text(text: insertion_any_form):
         if isinstance(text, str):
-            return ((text, len(text)),)
+            return [(text, visible_len(text))]
         if isinstance(text, tuple) and len(text) == 2 and isinstance(text[1], int):
-            return (text,)
+            return [text]
         if isinstance(text, tuple) or isinstance(text, list):
             text_mod = []
             for line in text:
                 if isinstance(line, str):
-                    text_mod.append((line, len(line)))
+                    text_mod.append((line, visible_len(line)))
                 elif isinstance(line, tuple) and len(line) == 2 and isinstance(line[1], int):
                     text_mod.append(line)
             return text_mod
@@ -77,6 +126,8 @@ class Term:
 class Style:
     RESET = '\033[0m'
     BOLD = '\033[1m'
+    BLINK_ON = '\033[5m'
+    BLINK_OFF = '\033[25m'
     BLACK = '\033[30m'
     RED = '\033[31m'
     GREEN = '\033[32m'
@@ -166,7 +217,6 @@ MENU = [
 MENU[2] = MENU[2].replace('[A]', Style.GREEN + '[A]' + Style.DEFAULT)
 MENU[2] = MENU[2].replace('[S]', Style.GREEN + '[S]' + Style.DEFAULT)
 MENU[5] = MENU[5].replace('[Enter]', Style.GREEN + '[Enter]' + Style.DEFAULT)
-MENU = list(map(lambda x: (x, 29), MENU))
 
 
 class LogicBlock:
@@ -196,7 +246,6 @@ def menu_handle(c: bytes):
         elif c == b'q':
             State.state = State.Enum.QUIT
         else:
-            Term.insert(MENU, align_center=True)
             token = str(c)[2:-1]
             message = (Style.RED + 'Unknown: ' +
                        Style.BRIGHT_BLACK + '[' +
@@ -207,19 +256,21 @@ def menu_handle(c: bytes):
 
 
 def add_print():
-    Term.insert('  ⮞ ' + State.parameter, y=-3)
-    tip = '    ' + Style.MAGENTA + 'Phrase'[:len(State.parameter)]
+    Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter, y=-3)
+    tip = 'Phrase'[:len(State.parameter)]
     if ' - ' in State.parameter:
-        if len(State.parameter) < 9:
-            tip = tip[:5] + '…'
-        tip += '   '
-        tip += Style.GREEN + 'Translation'[:len(State.parameter) - 9]
-    tip += Style.DEFAULT
+        dash_index = State.parameter.index(' - ')
+        if dash_index < 6:
+            tip = tip[:dash_index] + '…  '
+        else:
+            tip += ' ' * (dash_index - 3)
+        tip += Style.GREEN + 'Перевод'[:len(State.parameter) - dash_index - 3]
+    tip = '    ' + Style.BRIGHT_BLUE + tip + Style.DEFAULT
     Term.insert(tip, y=-2)
 
 
 def add_handle(c: bytes):
-    if c == b"'":
+    if c == b'/':
         State.state = State.Enum.MENU
         State.parameter = None
     elif c == b'\r':
@@ -229,7 +280,11 @@ def add_handle(c: bytes):
         if State.parameter:
             State.parameter = State.parameter[:-1]
     else:
-        State.parameter += str(c)[2:-1]
+        cs = str(c)[2:-1]
+        if ' - ' in State.parameter and cs in en2ru:
+            State.parameter += en2ru[cs]
+        else:
+            State.parameter += cs
 
 
 def main():
