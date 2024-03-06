@@ -1,13 +1,18 @@
 import sys
 import os
 import json
+from typing import NewType, Union
 from msvcrt import getch
 
+insertion_any_form = NewType('insertion_any_form', Union[
+    str,
+    tuple[str, int],
+    tuple[str, ...],
+    list[str],
+    tuple[tuple[str, int], ...],
+    list[tuple[str, int]]])
 
-class KeyCodes:
-    ENTER = 10
-    BACKSPACE = 8
-    CTRL_BACKSPACE = 127
+insertion = NewType('insertion', list[tuple[str, int]])
 
 
 class Term:
@@ -32,9 +37,31 @@ class Term:
         print(Term.reset_pos_code, Term.hide_cursor_code, '\n'.join(Term.buffer), sep='', end='')
 
     @staticmethod
-    def insert(text: tuple[tuple[str, int]] | list[tuple[str, int]], y: int = -1, align_center: bool = False):
-        if y == -1:
+    def _prepare_text(
+            text: insertion_any_form):
+        if isinstance(text, str):
+            return ((text, len(text)),)
+        if isinstance(text, tuple) and len(text) == 2 and isinstance(text[1], int):
+            return (text,)
+        if isinstance(text, tuple) or isinstance(text, list):
+            text_mod = []
+            for line in text:
+                if isinstance(line, str):
+                    text_mod.append((line, len(line)))
+                elif isinstance(line, tuple) and len(line) == 2 and isinstance(line[1], int):
+                    text_mod.append(line)
+            return text_mod
+        return []
+
+    @staticmethod
+    def insert(
+            text: insertion_any_form,
+            y: int | None = None, align_center: bool = False):
+        text = Term._prepare_text(text)
+        if y is None:
             y = (Term.in_height - len(text)) // 2
+        if y < 0:
+            y = Term.in_height + y
         for i in range(len(text)):
             line = text[i][0]
             line_width = text[i][1]
@@ -80,6 +107,23 @@ class Border:
     ARC_TR = '╰'  # '\u2570'
 
 
+class State:
+    class Enum:
+        MENU = 0
+        SCROLL = 1
+        ADD = 2
+        SEARCH = 3
+        QUIT = 4
+
+    class ScrollMode:
+        STRAIGHT = 0
+        REVERSE = 1
+
+    state = Enum.MENU
+    input = ''
+    scroll_mode = ScrollMode.STRAIGHT
+
+
 MENU = [
     '╭─────────────┬─────────────╮',  # 0
     '│  Add Phrase │   Search    │',  # 1
@@ -87,7 +131,7 @@ MENU = [
     '├─────────────┴─────────────┤',  # 3
     '│            Run            │',  # 4
     '│          [Enter]          │',  # 5
-    '╰───────────────────────────╯'   # 6
+    '╰───────────────────────────╯'  # 6
 ]
 MENU[2] = MENU[2].replace('[A]', Color.code['fg']['green'] + '[A]' + Color.code['fg']['default'])
 MENU[2] = MENU[2].replace('[S]', Color.code['fg']['green'] + '[S]' + Color.code['fg']['default'])
@@ -97,8 +141,29 @@ MENU = list(map(lambda x: (x, 29), MENU))
 with open("db.json", "r") as db_file:
     db = json.load(db_file)
 
+os.system('cls' if os.name == 'nt' else 'clear')
+State.state = State.Enum.MENU
+c = b"'"
 Term.clear()
 Term.insert(MENU, align_center=True)
-Term.draw()
-getch()
+while State.state != State.Enum.QUIT:
+    Term.draw()
+    c = getch()
+
+    Term.clear()
+    if State.state == State.Enum.MENU:
+        Term.insert(MENU, align_center=True)
+    if State.state == State.Enum.MENU:
+        if c == b'a':
+            # State.state = State.Enum.ADD
+            Term.insert('add', -2)
+        elif c == b's':
+            # State.state = State.Enum.SEARCH
+            Term.insert('search', -2)
+        elif c == b'\r':
+            # State.state = State.Enum.SCROLL
+            Term.insert('scroll', -2)
+        if c == b'q':
+            State.state = State.Enum.QUIT
+
 os.system('cls' if os.name == 'nt' else 'clear')
