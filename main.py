@@ -123,7 +123,7 @@ class Record:
     translation: str
     rate: float
 
-    def __init__(self, translation: str, rate: float = 0.5):
+    def __init__(self, translation: str, rate: float = 1):
         self.translation = translation
         self.rate = rate
 
@@ -486,7 +486,7 @@ def scroll_handle(c: str):
         DB.dump()
         State.scroll_reveal = False
     elif c == "'":
-        State.parameter[1].rate += (1 - State.parameter[1].rate) * 0.25
+        State.parameter[1].rate *= 1.25
         DB.dump()
         State.scroll_reveal = True
 
