@@ -345,6 +345,14 @@ def add_print():
     tip = '    ' + Style.BRIGHT_BLUE + tip + Style.DEFAULT
     Term.insert(tip, y=-2)
 
+    if State.parameter != '':
+        token = State.parameter.lower()
+        if ' - ' in token:
+            token = token[:token.index(' - ')]
+        filtered = sorted(filter(lambda s: token in s.lower(), State.db.keys()), reverse=True)[:9]
+        for i in range(len(filtered)):
+            Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} ' + filtered[i], -5 - i)
+
 
 def add_handle(c: bytes):
     if c == '/':
@@ -386,7 +394,7 @@ def search_print():
     Term.insert('    ' + tip + Style.BRIGHT_BLACK + '  [Tab] to swap' + Style.DEFAULT, y=-2)
 
     if State.parameter != '':
-        filtered = list(filter(lambda s: State.parameter in s.lower(), State.db.keys()))
+        filtered = sorted(filter(lambda s: State.parameter in s.lower(), State.db.keys()), reverse=True)[:9]
         for i in range(len(filtered)):
             Term.insert(f'{Style.BRIGHT_BLACK}[{i + 1}]{Style.DEFAULT} ' + filtered[i], -5 - i)
 
