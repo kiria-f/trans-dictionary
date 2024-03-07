@@ -1,6 +1,7 @@
 import os
 import json
 from dataclasses import dataclass
+import random
 from typing import NewType, Union
 from msvcrt import getch
 
@@ -118,13 +119,11 @@ def getch_unix() -> str:
 @dataclass
 class Record:
     translation: str
-    guessed: int
-    appeared: int
+    rate: float
 
     def __init__(self, translation: str):
         self.translation = translation
-        self.guessed = 0
-        self.appeared = 0
+        self.rate = 0.5
 
 
 class RecordEncoder(json.JSONEncoder):
@@ -414,6 +413,24 @@ def search_handle(c: str):
             State.parameter += en2ru[c]
         else:
             State.parameter += c
+
+
+def scroll_print():
+    items = State.db.items()
+    rate_sum = 0
+    for item in items:
+        rate_sum += item[1].rate
+    rnd = random.random() * rate_sum
+    for item in items:
+        if rnd < item[1].rate:
+            State.parameter = item[0]
+            break
+        rnd -= item[1].rate
+    State.parameter = '\b'  # error has occurred
+
+
+def scroll_handle(c: str):
+    pass
 
 
 def main():
