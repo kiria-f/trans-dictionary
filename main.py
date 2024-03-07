@@ -133,6 +133,21 @@ class RecordEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+class DB:
+    db: dict[str, Record] = {}
+
+    @staticmethod
+    def load():
+        with open('db.json', 'r', encoding='utf-8') as db_file:
+            db_raw = json.load(db_file)
+        DB.db = {k: Record(v['translation'], v['rate']) for k, v in db_raw.items()}
+
+    @staticmethod
+    def dump():
+        with open('db.json', 'w', encoding='utf-8') as db_file:
+            json.dump(DB.db, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
+
+
 class Term:
     clear_code = '\033[1J'
     reset_pos_code = '\033[H'
@@ -268,12 +283,11 @@ class State:
         REVERSE = 1
 
     state = Enum.MENU
-    parameter: None | str = None
+    parameter = None
     input = ''
     scroll_mode = ScrollMode.STRAIGHT
     scroll_reveal = False
     first_time = False
-    db: dict[str, Record] = {}
 
 
 MENU = [
@@ -351,7 +365,7 @@ def add_print():
         token = State.parameter.lower()
         if ' - ' in token:
             token = token[:token.index(' - ')]
-        filtered = sorted(filter(lambda s: token in s.lower(), State.db.keys()), reverse=True)[:9]
+        filtered = sorted(filter(lambda s: token in s.lower(), DB.db.keys()), reverse=True)[:9]
         for i in range(len(filtered)):
             Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} ' + filtered[i], -5 - i)
 
@@ -364,9 +378,8 @@ def add_handle(c: bytes):
         if ' - ' in State.parameter:
             key, val = State.parameter.split(' - ', 1)
             val = Record(val)
-            State.db[key] = val
-            with open('db.json', 'w', encoding='utf-8') as db_file:
-                json.dump(State.db, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
+            DB.db[key] = val
+            DB.dump()
             phrase = Style.BRIGHT_BLUE + State.parameter[:State.parameter.index(" - ")] + Style.DEFAULT
             State.parameter = f'Phrase {phrase} is successfully added'
         else:
@@ -396,7 +409,7 @@ def search_print():
     Term.insert('    ' + tip + Style.BRIGHT_BLACK + '  [Tab] to swap' + Style.DEFAULT, y=-2)
 
     if State.parameter != '':
-        filtered = sorted(filter(lambda s: State.parameter in s.lower(), State.db.keys()), reverse=True)[:9]
+        filtered = sorted(filter(lambda s: State.parameter in s.lower(), DB.db.keys()), reverse=True)[:9]
         for i in range(len(filtered)):
             Term.insert(f'{Style.BRIGHT_BLACK}[{i + 1}]{Style.DEFAULT} ' + filtered[i], -5 - i)
 
@@ -419,21 +432,26 @@ def search_handle(c: str):
 
 
 def scroll_print():
-    items = State.db.items()
-    rate_sum = 0
-    for item in items:
-        rate_sum += item[1].rate
-    rnd = random.random() * rate_sum
-    phrase: None | tuple[str, Record] = None
-    for item in items:
-        if rnd < item[1].rate:
-            phrase = item
-            break
-        rnd -= item[1].rate
+    if State.scroll_reveal:
+        phrase = State.parameter
+    else:
+        items = DB.db.items()
+        rate_sum = 0
+        for item in items:
+            rate_sum += item[1].rate
+        rnd = random.random() * rate_sum
+        phrase: None | tuple[str, Record] = None
+        for item in items:
+            if rnd < item[1].rate:
+                phrase = item
+                break
+            rnd -= item[1].rate
     Term.insert(phrase[0], Term.in_height // 2, True)
     if State.first_time:
         Term.insert(
-            f'{Style.GREEN}[/]{Style.DEFAULT} Menu, {Style.GREEN}[\']{Style.DEFAULT} Reveal',
+            f'{Style.GREEN}[/]{Style.DEFAULT} Menu, '
+            f'{Style.GREEN}[\']{Style.DEFAULT} Reveal, '
+            f'{Style.GREEN}[Enter]{Style.DEFAULT} Scroll next',
             Term.in_height // 2 + 2,
             True)
     if State.scroll_reveal:
@@ -446,15 +464,18 @@ def scroll_handle(c: str):
         State.state = State.Enum.MENU
         State.parameter = None
     elif c == '\n':
+        if not State.scroll_reveal:
+            State.parameter[1].rate *= 0.75
+        DB.dump()
         State.scroll_reveal = False
     elif c == "'":
+        State.parameter[1].rate += (1 - State.parameter[1].rate) * 0.25
+        DB.dump()
         State.scroll_reveal = True
 
 
 def main():
-    with open('db.json', 'r', encoding='utf-8') as db_file:
-        db_raw = json.load(db_file)
-    State.db = {k: Record(v['translation'], v['rate']) for k, v in db_raw.items()}
+    DB.load()
     if not DEBUG:
         os.system('cls' if os.name == 'nt' else 'clear')
     logic = {
