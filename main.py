@@ -108,6 +108,8 @@ def getch_nt() -> str:
         return '\n'
     if b == b'\x08':
         return '\b'
+    if b == b'\\':
+        return '\\'
     return str(b)[2:-1]
 
 
@@ -391,11 +393,21 @@ def add_handle(c: str):
         if State.parameter == 'to ':
             State.parameter = 'To '
     else:
-        if ' - ' in State.parameter and c in en2ru:
-            if State.parameter.index(' - ') == len(State.parameter) - 3:
-                State.parameter += en2ru[c].upper()
+        if ' - ' in State.parameter:
+            if State.parameter[-1] == '░' and c in (',', '.', ';'):
+                State.parameter += c
+            elif c in en2ru:
+                if State.parameter.index(' - ') == len(State.parameter) - 3:
+                    State.parameter += en2ru[c].upper()
+                else:
+                    State.parameter += en2ru[c]
             else:
-                State.parameter += en2ru[c]
+                if c == '\\' and State.parameter.index(' - ') != len(State.parameter) - 3:
+                    State.parameter += '░'
+                else:
+                    State.parameter += c
+            if State.parameter[-2] == '░':
+                State.parameter = State.parameter[:-2] + c
         else:
             if len(State.parameter) == 0:
                 State.parameter += c.upper()
