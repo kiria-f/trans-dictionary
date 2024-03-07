@@ -50,6 +50,39 @@ en2ru = {
     'm': 'ь',
     ',': 'б',
     '.': 'ю',
+    '~': 'Ё',
+    'Q': 'Й',
+    'W': 'Ц',
+    'E': 'У',
+    'R': 'К',
+    'T': 'Е',
+    'Y': 'Н',
+    'U': 'Г',
+    'I': 'Ш',
+    'O': 'Щ',
+    'P': 'З',
+    '{': 'Х',
+    '}': 'Ъ',
+    'A': 'Ф',
+    'S': 'Ы',
+    'D': 'В',
+    'F': 'А',
+    'G': 'П',
+    'H': 'Р',
+    'J': 'О',
+    'K': 'Л',
+    'L': 'Д',
+    ':': 'Ж',
+    '"': 'Э',
+    'Z': 'Я',
+    'X': 'Ч',
+    'C': 'С',
+    'V': 'М',
+    'B': 'И',
+    'N': 'Т',
+    'M': 'Ь',
+    '<': 'Б',
+    '>': 'Ю'
 }
 
 ru2en = {v: k for k, v in en2ru.items()}
@@ -145,7 +178,7 @@ class Term:
     def insert(text: insertion_any_form, y: int | None = None, align_center: bool = False):
         text = Term._prepare_text(text)
         if y is None:
-            y = (Term.in_height - len(text)) // 2
+            y = (Term.in_height - len(text)) // 2 + 1
         if y < 0:
             y = Term.in_height + y
         for i in range(len(text)):
@@ -243,17 +276,19 @@ class State:
 
 
 MENU = [
-    '╭─────────────┬─────────────╮',  # 0
-    '│  Add Phrase │   Search    │',  # 1
-    '│     [A]     │     [S]     │',  # 2
-    '├─────────────┴─────────────┤',  # 3
-    '│            Run            │',  # 4
-    '│          [Enter]          │',  # 5
-    '╰───────────────────────────╯'  # 6
+    '╭──────────────┬──────────────╮',  # 0
+    '│ [A]dd Phrase │   [S]earch   │',  # 1
+    '├──────────────┴──────────────┤',  # 2
+    '│             Run             │',  # 3
+    '│           [Enter]           │',  # 4
+    '╰──────┬───────────────┬──────╯',  # 5
+    '       │   🠜 [Q]uit    │       ',  # 6
+    '       ╰───────────────╯       ',  # 7
 ]
-MENU[2] = MENU[2].replace('[A]', Style.GREEN + '[A]' + Style.DEFAULT)
-MENU[2] = MENU[2].replace('[S]', Style.GREEN + '[S]' + Style.DEFAULT)
-MENU[5] = MENU[5].replace('[Enter]', Style.GREEN + '[Enter]' + Style.DEFAULT)
+MENU[1] = MENU[1].replace('[A]', Style.GREEN + '[A]' + Style.DEFAULT)
+MENU[1] = MENU[1].replace('[S]', Style.GREEN + '[S]' + Style.DEFAULT)
+MENU[4] = MENU[4].replace('[Enter]', Style.GREEN + '[Enter]' + Style.DEFAULT)
+MENU[6] = MENU[6].replace('[Q]', Style.RED + '[Q]' + Style.DEFAULT)
 
 
 class LogicBlock:
@@ -271,7 +306,7 @@ def menu_print():
         Term.insert(State.parameter, -2, True)
 
 
-def menu_handle(c: bytes):
+def menu_handle(c: str):
     if State.state == State.Enum.MENU:
         if c == 'a':
             State.parameter = ''
@@ -303,6 +338,10 @@ def add_print():
         else:
             tip += ' ' * (dash_index - 3)
         tip += Style.GREEN + 'Перевод'[:len(State.parameter) - dash_index - 3]
+        if len(State.parameter) - dash_index - 3 < 7:
+            tip += '…'
+    else:
+        tip += '…'
     tip = '    ' + Style.BRIGHT_BLUE + tip + Style.DEFAULT
     Term.insert(tip, y=-2)
 
@@ -318,13 +357,15 @@ def add_handle(c: bytes):
             State.db[key] = val
             with open('db.json', 'w', encoding='utf-8') as db_file:
                 json.dump(State.db, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
+            phrase = Style.BRIGHT_BLUE + State.parameter[:State.parameter.index(" - ")] + Style.DEFAULT
+            State.parameter = f'Phrase {phrase} is successfully added'
+        else:
+            State.parameter = Style.RED + 'Phrase is not added' + Style.DEFAULT
         State.state = State.Enum.MENU
-        State.parameter = None
     elif c == '\b':
         if State.parameter:
             State.parameter = State.parameter[:-1]
     else:
-        c = c.lower()
         if ' - ' in State.parameter and c in en2ru:
             if State.parameter.index(' - ') == len(State.parameter) - 3:
                 State.parameter += en2ru[c].upper()
