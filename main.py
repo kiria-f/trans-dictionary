@@ -1,5 +1,6 @@
 import os
 import json
+from dataclasses import dataclass
 from typing import NewType, Union
 from msvcrt import getch
 
@@ -63,6 +64,25 @@ def visible_len(line: str):
             vl += 1
         i += 1
     return vl
+
+
+@dataclass
+class Record:
+    translation: str
+    guessed: int
+    appeared: int
+
+    def __init__(self, translation: str):
+        self.translation = translation
+        self.guessed = 0
+        self.appeared = 0
+
+
+class RecordEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Record):
+            return obj.__dict__
+        return json.JSONEncoder.default(self, obj)
 
 
 class Term:
@@ -203,7 +223,7 @@ class State:
     parameter: None | str = None
     input = ''
     scroll_mode = ScrollMode.STRAIGHT
-    db: dict[str, str] = {}
+    db: dict[str, Record] = {}
 
 
 MENU = [
@@ -277,9 +297,10 @@ def add_handle(c: bytes):
     elif c == b'\r':
         if ' - ' in State.parameter:
             key, val = State.parameter.split(' - ', 1)
+            val = Record(val)
             State.db[key] = val
-            with open('db.json', 'w') as db_file:
-                json.dump(State.db, db_file)
+            with open('db.json', 'w', encoding='utf-8') as db_file:
+                json.dump(State.db, db_file, cls=RecordEncoder, ensure_ascii=False)
         State.state = State.Enum.MENU
         State.parameter = None
     elif c == b'\b':
@@ -299,7 +320,7 @@ def add_handle(c: bytes):
 
 
 def main():
-    with open('db.json', 'r') as db_file:
+    with open('db.json', 'r', encoding='utf-8') as db_file:
         State.db = json.load(db_file)
     if not DEBUG:
         os.system('cls' if os.name == 'nt' else 'clear')
