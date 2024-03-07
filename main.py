@@ -121,9 +121,9 @@ class Record:
     translation: str
     rate: float
 
-    def __init__(self, translation: str):
+    def __init__(self, translation: str, rate: float = 0.5):
         self.translation = translation
-        self.rate = 0.5
+        self.rate = rate
 
 
 class RecordEncoder(json.JSONEncoder):
@@ -271,6 +271,8 @@ class State:
     parameter: None | str = None
     input = ''
     scroll_mode = ScrollMode.STRAIGHT
+    scroll_reveal = False
+    first_time = False
     db: dict[str, Record] = {}
 
 
@@ -315,6 +317,7 @@ def menu_handle(c: str):
             State.state = State.Enum.SEARCH
         elif c == '\n':
             State.parameter = ''
+            State.first_time = True
             State.state = State.Enum.SCROLL
         elif c == 'q':
             State.state = State.Enum.QUIT
@@ -421,27 +424,44 @@ def scroll_print():
     for item in items:
         rate_sum += item[1].rate
     rnd = random.random() * rate_sum
+    phrase: None | tuple[str, Record] = None
     for item in items:
         if rnd < item[1].rate:
-            State.parameter = item[0]
+            phrase = item
             break
         rnd -= item[1].rate
-    State.parameter = '\b'  # error has occurred
+    Term.insert(phrase[0], Term.in_height // 2, True)
+    if State.first_time:
+        Term.insert(
+            f'{Style.GREEN}[/]{Style.DEFAULT} Menu, {Style.GREEN}[\']{Style.DEFAULT} Reveal',
+            Term.in_height // 2 + 2,
+            True)
+    if State.scroll_reveal:
+        Term.insert(Style.YELLOW + phrase[1].translation + Style.DEFAULT, Term.in_height // 2 + 2, True)
+    State.parameter = phrase
 
 
 def scroll_handle(c: str):
-    pass
+    if c == '/':
+        State.state = State.Enum.MENU
+        State.parameter = None
+    elif c == '\n':
+        State.scroll_reveal = False
+    elif c == "'":
+        State.scroll_reveal = True
 
 
 def main():
     with open('db.json', 'r', encoding='utf-8') as db_file:
-        State.db = json.load(db_file)
+        db_raw = json.load(db_file)
+    State.db = {k: Record(v['translation'], v['rate']) for k, v in db_raw.items()}
     if not DEBUG:
         os.system('cls' if os.name == 'nt' else 'clear')
     logic = {
         State.Enum.MENU: LogicBlock(menu_print, menu_handle),
         State.Enum.ADD: LogicBlock(add_print, add_handle),
         State.Enum.SEARCH: LogicBlock(search_print, search_handle),
+        State.Enum.SCROLL: LogicBlock(scroll_print, scroll_handle)
     }
 
     State.state = State.Enum.MENU
@@ -454,6 +474,7 @@ def main():
             c = getch_nt()
         else:
             c = getch_unix()
+        State.first_time = State.state == State.Enum.MENU
         logic[State.state].handler(c)
         Term.reset()
 
