@@ -52,6 +52,8 @@ en2ru = {
     '.': 'ю',
 }
 
+ru2en = {v: k for k, v in en2ru.items()}
+
 
 def visible_len(line: str):
     vl = 0
@@ -64,6 +66,20 @@ def visible_len(line: str):
             vl += 1
         i += 1
     return vl
+
+
+def getch_nt() -> str:
+    b = getch()
+    if b == b'\r':
+        return '\n'
+    if b == b'\x08':
+        return '\b'
+    return str(b)[2:-1]
+
+
+def getch_unix() -> str:
+    b = os.read(0, 1)
+    return str(b)[2:-1]
 
 
 @dataclass
@@ -257,23 +273,24 @@ def menu_print():
 
 def menu_handle(c: bytes):
     if State.state == State.Enum.MENU:
-        if c == b'a':
-            State.state = State.Enum.ADD
+        if c == 'a':
             State.parameter = ''
-        elif c == b's':
+            State.state = State.Enum.ADD
+        elif c == 's':
+            State.parameter = ''
             State.state = State.Enum.SEARCH
-        elif c == b'\r':
+        elif c == '\n':
+            State.parameter = ''
             State.state = State.Enum.SCROLL
-        elif c == b'q':
+        elif c == 'q':
             State.state = State.Enum.QUIT
         else:
-            token = str(c)[2:-1]
             message = (Style.RED + 'Unknown: ' +
                        Style.BRIGHT_BLACK + '[' +
-                       Style.DEFAULT + token +
+                       Style.DEFAULT + c +
                        Style.BRIGHT_BLACK + ']' +
                        Style.DEFAULT)
-            State.parameter = (message, 11 + len(token))
+            State.parameter = (message, 11 + len(c))
 
 
 def add_print():
@@ -291,32 +308,63 @@ def add_print():
 
 
 def add_handle(c: bytes):
-    if c == b'/':
+    if c == '/':
         State.state = State.Enum.MENU
         State.parameter = None
-    elif c == b'\r':
+    elif c == '\n':
         if ' - ' in State.parameter:
             key, val = State.parameter.split(' - ', 1)
             val = Record(val)
             State.db[key] = val
             with open('db.json', 'w', encoding='utf-8') as db_file:
-                json.dump(State.db, db_file, cls=RecordEncoder, ensure_ascii=False)
+                json.dump(State.db, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
         State.state = State.Enum.MENU
         State.parameter = None
-    elif c == b'\b':
+    elif c == '\b':
         if State.parameter:
             State.parameter = State.parameter[:-1]
     else:
-        cs = str(c)[2:-1].lower()
-        if ' - ' in State.parameter and cs in en2ru:
+        c = c.lower()
+        if ' - ' in State.parameter and c in en2ru:
             if State.parameter.index(' - ') == len(State.parameter) - 3:
-                State.parameter += en2ru[cs].upper()
+                State.parameter += en2ru[c].upper()
             else:
-                State.parameter += en2ru[cs]
+                State.parameter += en2ru[c]
         else:
             if len(State.parameter) == 0:
-                cs = cs.upper()
-            State.parameter += cs
+                c = c.upper()
+            State.parameter += c
+
+
+def search_print():
+    Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter, y=-3)
+    if State.scroll_mode == State.ScrollMode.STRAIGHT:
+        tip = Style.BRIGHT_BLUE + 'Search'
+    else:
+        tip = Style.GREEN + 'Поиск'
+    Term.insert('    ' + tip + Style.BRIGHT_BLACK + '  [Tab] to swap' + Style.DEFAULT, y=-2)
+
+    if State.parameter != '':
+        filtered = list(filter(lambda s: State.parameter in s.lower(), State.db.keys()))
+        for i in range(len(filtered)):
+            Term.insert(f'{Style.BRIGHT_BLACK}[{i + 1}]{Style.DEFAULT} ' + filtered[i], -5 - i)
+
+
+def search_handle(c: str):
+    if c == '/':
+        State.state = State.Enum.MENU
+        State.parameter = None
+    elif c == '\t':
+        State.scroll_mode = 1 - State.scroll_mode
+        State.parameter = ''
+    elif c == '\b':
+        if State.parameter:
+            State.parameter = State.parameter[:-1]
+    else:
+        if State.scroll_mode == State.ScrollMode.REVERSE and c in en2ru:
+            State.parameter += en2ru[c]
+        else:
+            State.parameter += c
 
 
 def main():
@@ -327,6 +375,7 @@ def main():
     logic = {
         State.Enum.MENU: LogicBlock(menu_print, menu_handle),
         State.Enum.ADD: LogicBlock(add_print, add_handle),
+        State.Enum.SEARCH: LogicBlock(search_print, search_handle),
     }
 
     State.state = State.Enum.MENU
@@ -335,7 +384,11 @@ def main():
     while State.state != State.Enum.QUIT:
         logic[State.state].printer()
         Term.draw()
-        logic[State.state].handler(getch())
+        if os.name == 'nt':
+            c = getch_nt()
+        else:
+            c = getch_unix()
+        logic[State.state].handler(c)
         Term.reset()
 
     print(Style.RESET, end='')
