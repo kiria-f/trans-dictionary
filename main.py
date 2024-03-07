@@ -370,7 +370,7 @@ def add_print():
             Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} ' + filtered[i], -5 - i)
 
 
-def add_handle(c: bytes):
+def add_handle(c: str):
     if c == '/':
         State.state = State.Enum.MENU
         State.parameter = None
@@ -388,6 +388,8 @@ def add_handle(c: bytes):
     elif c == '\b':
         if State.parameter:
             State.parameter = State.parameter[:-1]
+        if State.parameter == 'to ':
+            State.parameter = 'To '
     else:
         if ' - ' in State.parameter and c in en2ru:
             if State.parameter.index(' - ') == len(State.parameter) - 3:
@@ -396,8 +398,11 @@ def add_handle(c: bytes):
                 State.parameter += en2ru[c]
         else:
             if len(State.parameter) == 0:
-                c = c.upper()
-            State.parameter += c
+                State.parameter += c.upper()
+            elif State.parameter == 'To ':
+                State.parameter = 'to ' + c.upper()
+            else:
+                State.parameter += c
 
 
 def search_print():
