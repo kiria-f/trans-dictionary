@@ -110,6 +110,8 @@ def getch_nt() -> str:
         return '\b'
     if b == b'\\':
         return '\\'
+    if b == b'\t':
+        return '\t'
     return str(b)[2:-1]
 
 
@@ -287,14 +289,15 @@ class State:
         EXPLORE = 'explore'
         QUIT = 'quit'
 
-    class ScrollMode:
+    class Direction:
         STRAIGHT = 0
         REVERSE = 1
 
     state = Enum.MENU
     parameter = None
     input = ''
-    scroll_mode = ScrollMode.STRAIGHT
+    scroll_mode = Direction.STRAIGHT
+    explore_mode = Direction.STRAIGHT
     scroll_reveal = False
     first_time = False
 
@@ -432,7 +435,7 @@ def add_handle(c: str):
 
 def explore_print():
     Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter, y=-3)
-    if State.scroll_mode == State.ScrollMode.STRAIGHT:
+    if State.scroll_mode == State.Direction.STRAIGHT:
         tip = Style.BRIGHT_BLUE + 'Search'
     else:
         tip = Style.GREEN + 'Поиск'
@@ -455,7 +458,7 @@ def explore_handle(c: str):
         if State.parameter:
             State.parameter = State.parameter[:-1]
     else:
-        if State.scroll_mode == State.ScrollMode.REVERSE and c in en2ru:
+        if State.scroll_mode == State.Direction.REVERSE and c in en2ru:
             State.parameter += en2ru[c]
         else:
             State.parameter += c
