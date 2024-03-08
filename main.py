@@ -89,7 +89,7 @@ en2ru = {
 ru2en = {v: k for k, v in en2ru.items()}
 
 
-def visible_len(line: str):
+def visible_len(line: str) -> int:
     vl = 0
     i = 0
     while i < len(line):
@@ -102,22 +102,89 @@ def visible_len(line: str):
     return vl
 
 
-def getch_nt() -> str:
+class Key:
+    class Special:
+        PRINTABLE = 0
+        ENTER = 1
+        BACKSPACE = 2
+        TAB = 3
+        ESC = 4
+        SHIFT = 5
+        CTRL = 6
+        ARROW_UP = 10
+        ARROW_DOWN = 11
+        ARROW_LEFT = 12
+        ARROW_RIGHT = 13
+
+    printable: str
+    special: int
+    special_prints: dict[int, str] = {
+        Special.PRINTABLE: '⌨',
+        Special.ENTER: '↵',
+        Special.BACKSPACE: '⌫',
+        Special.TAB: '↹',
+        Special.ESC: '⎋',
+        Special.SHIFT: '⇧',
+        Special.CTRL: '⌃',
+        Special.ARROW_UP: '↑',
+        Special.ARROW_DOWN: '↓',
+        Special.ARROW_LEFT: '←',
+        Special.ARROW_RIGHT: '→',
+    }
+
+    def __init__(self, value: str | int) -> None:
+        if isinstance(value, str):
+            self.printable = value
+            self.special = Key.Special.PRINTABLE
+        else:
+            self.special = value
+            self.printable = ''
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, str):
+            return self.printable == other
+        if isinstance(other, int):
+            return self.special == other
+        return self == other
+
+    def __hash__(self):
+        return hash(self.printable)
+
+    def __str__(self) -> str:
+        return self.printable
+
+    def force_str(self) -> str:
+        if self.special:
+            return self.special_prints[self.special]
+        return self.printable
+
+
+def getch_nt() -> Key:
     b = getch()
     if b == b'\r':
-        return '\n'
+        return Key(Key.Special.ENTER)
     if b == b'\x08':
-        return '\b'
+        return Key(Key.Special.BACKSPACE)
     if b == b'\\':
-        return '\\'
+        return Key('\\')
     if b == b'\t':
-        return '\t'
-    return str(b)[2:-1]
+        return Key(Key.Special.TAB)
+    if b == b'\xe0':
+        b = getch()
+        if b == b'H':
+            return Key(Key.Special.ARROW_UP)
+        if b == b'P':
+            return Key(Key.Special.ARROW_DOWN)
+        if b == b'K':
+            return Key(Key.Special.ARROW_LEFT)
+        if b == b'M':
+            return Key(Key.Special.ARROW_RIGHT)
+    return Key(str(b)[2:-1])
 
 
-def getch_unix() -> str:
+def getch_unix() -> Key:
     b = os.read(0, 1)
-    return str(b)[2:-1]
+    return Key(str(b)[2:-1])
 
 
 @dataclass
@@ -125,7 +192,7 @@ class Record:
     translation: str
     rate: float
 
-    def __init__(self, translation: str, rate: float = 1):
+    def __init__(self, translation: str, rate: float = 1) -> None:
         self.translation = translation
         self.rate = rate
 
@@ -141,13 +208,13 @@ class DB:
     db: dict[str, Record] = {}
 
     @staticmethod
-    def load():
+    def load() -> None:
         with open('db.json', 'r', encoding='utf-8') as db_file:
             db_raw = json.load(db_file)
         DB.db = {k: Record(v['translation'], v['rate']) for k, v in db_raw.items()}
 
     @staticmethod
-    def dump():
+    def dump() -> None:
         with open('db.json', 'w', encoding='utf-8') as db_file:
             json.dump(DB.db, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
 
@@ -163,32 +230,31 @@ class Term:
     buffer = [' ' * width] * height
 
     @staticmethod
-    def refresh():
+    def refresh() -> None:
         os.system('cls' if os.name == 'nt' else 'clear')
         Term.width, Term.height = os.get_terminal_size()
         Term.in_width, Term.in_height = Term.width - 2, Term.height - 2
 
-
     @staticmethod
-    def reset():
+    def reset() -> None:
         title = 'Trans Dictionary'
         Term.buffer = ['│' + ' ' * Term.in_width + '│'] * Term.height
         Term.buffer[0] = '╭' + f'┐{title}┌'.center(Term.in_width, '─') + '╮'
         Term.buffer[Term.height - 1] = '╰' + '─' * Term.in_width + '╯'
 
     @staticmethod
-    def draw():
+    def draw() -> None:
         if DEBUG:
             print(Term.hide_cursor_code, '\n'.join(Term.buffer), sep='', end='')
         else:
             print(Term.reset_pos_code, Term.hide_cursor_code, '\n'.join(Term.buffer), sep='', end='')
 
     @staticmethod
-    def _prepare_text(text: insertion_any_form):
+    def _prepare_text(text: insertion_any_form) -> list[tuple[str, int]]:
         if isinstance(text, str):
             return [(text, visible_len(text))]
         if isinstance(text, tuple) and len(text) == 2 and isinstance(text[1], int):
-            return [text]
+            return [(text[0], text[1])]
         if isinstance(text, tuple) or isinstance(text, list):
             text_mod = []
             for line in text:
@@ -200,7 +266,7 @@ class Term:
         return []
 
     @staticmethod
-    def insert(text: insertion_any_form, y: int | None = None, align_center: bool = False):
+    def insert(text: insertion_any_form, y: int | None = None, align_center: bool = False) -> None:
         text = Term._prepare_text(text)
         if y is None:
             y = (Term.in_height - len(text)) // 2 + 1
@@ -258,7 +324,7 @@ class Style:
     BRIGHT_WHITE_BG = '\033[107m'
 
     @staticmethod
-    def from_hex(color: str, background: bool = False):
+    def from_hex(color: str, background: bool = False) -> str:
         color = color.lstrip('#')
         r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
         return f'\033[{"48" if background else "38"};2;{r};{g};{b}m'
@@ -337,29 +403,29 @@ def menu_print():
         Term.insert(State.parameter, -2, True)
 
 
-def menu_handle(c: str):
+def menu_handle(k: Key):
     if State.state == State.Enum.MENU:
-        if c == 'a':
+        if k == 'a':
             State.parameter = ''
             State.state = State.Enum.ADD
-        elif c == 'e':
+        elif k == 'e':
             State.parameter = ''
             State.state = State.Enum.EXPLORE
-        elif c == '\n':
+        elif k == Key.Special.ENTER:
             State.parameter = ''
             State.first_time = True
             State.state = State.Enum.SCROLL
-        elif c == 'r':
+        elif k == 'r':
             Term.refresh()
-        elif c == 'q':
+        elif k == 'q':
             State.state = State.Enum.QUIT
         else:
             message = (Style.RED + 'Unknown: ' +
                        Style.BRIGHT_BLACK + '[' +
-                       Style.DEFAULT + c +
+                       Style.DEFAULT + k.force_str() +
                        Style.BRIGHT_BLACK + ']' +
                        Style.DEFAULT)
-            State.parameter = (message, 11 + len(c))
+            State.parameter = message
 
 
 def add_print():
@@ -388,11 +454,11 @@ def add_print():
             Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} ' + filtered[i], -5 - i)
 
 
-def add_handle(c: str):
-    if c == '/':
+def add_handle(k: Key):
+    if k == '/':
         State.state = State.Enum.MENU
         State.parameter = None
-    elif c == '\n':
+    elif k == Key.Special.ENTER:
         if ' - ' in State.parameter:
             key, val = State.parameter.split(' - ', 1)
             val = Record(val)
@@ -403,34 +469,34 @@ def add_handle(c: str):
         else:
             State.parameter = Style.RED + 'Phrase is not added' + Style.DEFAULT
         State.state = State.Enum.MENU
-    elif c == '\b':
+    elif k == Key.Special.BACKSPACE:
         if State.parameter:
             State.parameter = State.parameter[:-1]
         if State.parameter == 'to ':
             State.parameter = 'To '
     else:
         if ' - ' in State.parameter:
-            if State.parameter[-1] == '░' and c in (',', '.', ';'):
-                State.parameter += c
-            elif c in en2ru:
+            if State.parameter[-1] == '░':
+                State.parameter = State.parameter[:-1]
+                if k in (',', '.', ';'):
+                    State.parameter += str(k)
+            elif k in en2ru:
                 if State.parameter.index(' - ') == len(State.parameter) - 3:
-                    State.parameter += en2ru[c].upper()
+                    State.parameter += en2ru[k].upper()
                 else:
-                    State.parameter += en2ru[c]
+                    State.parameter += en2ru[k]
             else:
-                if c == '\\' and State.parameter.index(' - ') != len(State.parameter) - 3:
+                if k == '\\' and State.parameter.index(' - ') != len(State.parameter) - 3:
                     State.parameter += '░'
                 else:
-                    State.parameter += c
-            if State.parameter[-2] == '░':
-                State.parameter = State.parameter[:-2] + c
+                    State.parameter += str(k)
         else:
             if len(State.parameter) == 0:
-                State.parameter += c.upper()
+                State.parameter += str(k).upper()
             elif State.parameter == 'To ':
-                State.parameter = 'to ' + c.upper()
+                State.parameter = 'to ' + str(k).upper()
             else:
-                State.parameter += c
+                State.parameter += str(k)
 
 
 def explore_print():
@@ -447,21 +513,21 @@ def explore_print():
             Term.insert(f'{Style.BRIGHT_BLACK}[{i + 1}]{Style.DEFAULT} ' + filtered[i], -5 - i)
 
 
-def explore_handle(c: str):
-    if c == '/':
+def explore_handle(k: Key):
+    if k == '/':
         State.state = State.Enum.MENU
         State.parameter = None
-    elif c == '\t':
+    elif k == Key.Special.TAB:
         State.scroll_mode = 1 - State.scroll_mode
         State.parameter = ''
-    elif c == '\b':
+    elif k == '\b':
         if State.parameter:
             State.parameter = State.parameter[:-1]
     else:
-        if State.scroll_mode == State.Direction.REVERSE and c in en2ru:
-            State.parameter += en2ru[c]
+        if State.scroll_mode == State.Direction.REVERSE and k in en2ru:
+            State.parameter += en2ru[k]
         else:
-            State.parameter += c
+            State.parameter += k
 
 
 def scroll_print():
@@ -492,16 +558,16 @@ def scroll_print():
     State.parameter = phrase
 
 
-def scroll_handle(c: str):
-    if c == '/':
+def scroll_handle(k: Key):
+    if k == '/':
         State.state = State.Enum.MENU
         State.parameter = None
-    elif c == '\n':
+    elif k == '\n':
         if not State.scroll_reveal:
             State.parameter[1].rate *= 0.75
         DB.dump()
         State.scroll_reveal = False
-    elif c == "'":
+    elif k == "'":
         State.parameter[1].rate *= 1.25
         DB.dump()
         State.scroll_reveal = True
