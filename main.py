@@ -161,6 +161,13 @@ class Term:
     buffer = [' ' * width] * height
 
     @staticmethod
+    def refresh():
+        os.system('cls' if os.name == 'nt' else 'clear')
+        Term.width, Term.height = os.get_terminal_size()
+        Term.in_width, Term.in_height = Term.width - 2, Term.height - 2
+
+
+    @staticmethod
     def reset():
         title = 'Trans Dictionary'
         Term.buffer = ['│' + ' ' * Term.in_width + '│'] * Term.height
@@ -277,7 +284,7 @@ class State:
         MENU = 'menu'
         SCROLL = 'scroll'
         ADD = 'add'
-        SEARCH = 'search'
+        EXPLORE = 'explore'
         QUIT = 'quit'
 
     class ScrollMode:
@@ -294,18 +301,22 @@ class State:
 
 MENU = [
     '╭──────────────┬──────────────╮',  # 0
-    '│ [A]dd Phrase │   [S]earch   │',  # 1
+    '│ [A]dd Phrase │  [E]xplore   │',  # 1
     '├──────────────┴──────────────┤',  # 2
     '│             Run             │',  # 3
     '│           [Enter]           │',  # 4
-    '╰──────┬───────────────┬──────╯',  # 5
-    '       │   🠜 [Q]uit    │       ',  # 6
-    '       ╰───────────────╯       ',  # 7
+    '├──────────────┬──────────────┤',  # 5
+    '│  [S]ettings  │  [R]efresh   │',  # 6
+    '╰──────┬───────┴───────┬──────╯',  # 7
+    '       │   🠜 [Q]uit    │       ',  # 8
+    '       ╰───────────────╯       ',  # 9
 ]
 MENU[1] = MENU[1].replace('[A]', Style.GREEN + '[A]' + Style.DEFAULT)
-MENU[1] = MENU[1].replace('[S]', Style.GREEN + '[S]' + Style.DEFAULT)
+MENU[1] = MENU[1].replace('[E]', Style.GREEN + '[E]' + Style.DEFAULT)
 MENU[4] = MENU[4].replace('[Enter]', Style.GREEN + '[Enter]' + Style.DEFAULT)
-MENU[6] = MENU[6].replace('[Q]', Style.RED + '[Q]' + Style.DEFAULT)
+MENU[6] = MENU[6].replace('[S]', Style.GREEN + '[S]' + Style.DEFAULT)
+MENU[6] = MENU[6].replace('[R]', Style.GREEN + '[R]' + Style.DEFAULT)
+MENU[8] = MENU[8].replace('[Q]', Style.RED + '[Q]' + Style.DEFAULT)
 
 
 class LogicBlock:
@@ -328,13 +339,15 @@ def menu_handle(c: str):
         if c == 'a':
             State.parameter = ''
             State.state = State.Enum.ADD
-        elif c == 's':
+        elif c == 'e':
             State.parameter = ''
-            State.state = State.Enum.SEARCH
+            State.state = State.Enum.EXPLORE
         elif c == '\n':
             State.parameter = ''
             State.first_time = True
             State.state = State.Enum.SCROLL
+        elif c == 'r':
+            Term.refresh()
         elif c == 'q':
             State.state = State.Enum.QUIT
         else:
@@ -417,7 +430,7 @@ def add_handle(c: str):
                 State.parameter += c
 
 
-def search_print():
+def explore_print():
     Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter, y=-3)
     if State.scroll_mode == State.ScrollMode.STRAIGHT:
         tip = Style.BRIGHT_BLUE + 'Search'
@@ -431,7 +444,7 @@ def search_print():
             Term.insert(f'{Style.BRIGHT_BLACK}[{i + 1}]{Style.DEFAULT} ' + filtered[i], -5 - i)
 
 
-def search_handle(c: str):
+def explore_handle(c: str):
     if c == '/':
         State.state = State.Enum.MENU
         State.parameter = None
@@ -498,7 +511,7 @@ def main():
     logic = {
         State.Enum.MENU: LogicBlock(menu_print, menu_handle),
         State.Enum.ADD: LogicBlock(add_print, add_handle),
-        State.Enum.SEARCH: LogicBlock(search_print, search_handle),
+        State.Enum.EXPLORE: LogicBlock(explore_print, explore_handle),
         State.Enum.SCROLL: LogicBlock(scroll_print, scroll_handle)
     }
 
