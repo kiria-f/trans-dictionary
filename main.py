@@ -36,6 +36,19 @@ def visible_len(line: str) -> int:
     return vl
 
 
+def visible_index(line: str, index: int) -> int:
+    vi = 0
+    i = 0
+    while i < index:
+        if line[vi] == '\033':
+            while line[vi] != 'm':
+                vi += 1
+        else:
+            i += 1
+        vi += 1
+    return vi - 1
+
+
 class Key:
     class Special:
         PRINTABLE = 0
@@ -216,6 +229,9 @@ class Term:
                 line = ' ' * x + line + ' ' * (Term.in_width - x - line_width)
             else:
                 line += ' ' * (Term.in_width - line_width)
+            v_len = visible_len(line)
+            if v_len > Term.in_width:
+                line = line[:visible_index(line, Term.in_width)] + '…'
             Term.buffer[y + i] = '│' + line + '│'
 
 
@@ -392,9 +408,10 @@ def add_print():
         token = State.parameter.lower()
         if ' - ' in token:
             token = token[:token.index(' - ')]
-        filtered = sorted(filter(lambda s: token in s.lower(), DB.db.keys()), reverse=True)[:9]
+        filtered = sorted(filter(lambda item: token in item[0].lower(), DB.db.items()), reverse=True)[:9]
         for i in range(len(filtered)):
-            Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} ' + filtered[i], -5 - i)
+            Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} '
+                        + filtered[i][0] + ' - ' + filtered[i][1].translation, -5 - i)
 
 
 def add_handle(k: Key):
