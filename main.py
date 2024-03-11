@@ -468,12 +468,14 @@ def explore_print():
     Term.insert('    ' + tip + Style.BRIGHT_BLACK + '  [Tab] to swap' + Style.DEFAULT, y=-2)
 
     if State.parameter[0] != '':
-        filtered = sorted(filter(lambda s: State.parameter[0].lower() in s.lower(), DB.db.keys()), reverse=True)[:9]
+        filtered = sorted(filter(lambda s: State.parameter[0].lower() in s[0].lower() + s[1].translation.lower(),
+                                 DB.db.items()),
+                          reverse=True)[:9]
         if State.selection >= len(filtered):
             State.selection = len(filtered) - 1
         for i in range(len(filtered)):
             num_color = Style.GREEN if i == State.selection else Style.BRIGHT_BLACK
-            line = f'{num_color}[{i + 1}]{Style.DEFAULT} {filtered[i]}'
+            line = f'{num_color}[{i + 1}]{Style.DEFAULT} {filtered[i][0]} - {filtered[i][1].translation}'
             if i == State.selection:
                 line = Style.from_hex('#333', True) + line + ' ' + Style.DEFAULT_BG
             Term.insert(line, -5 - i)
