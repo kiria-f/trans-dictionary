@@ -320,6 +320,7 @@ class State:
     scroll_mode = Direction.STRAIGHT
     explore_mode = Direction.STRAIGHT
     selection = -1
+    cursor_index = -1
     scroll_reveal = False
     first_time = False
 
