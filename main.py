@@ -171,12 +171,15 @@ class DB:
 class Term:
     clear_code = '\033[1J'
     reset_pos_code = '\033[H'
+    save_pos_code = '\033s'
+    restore_pos_code = '\033u'
     hide_cursor_code = '\033[?25l'
     show_cursor_code = '\033[?25h'
 
     width, height = os.get_terminal_size()
     in_width, in_height = width - 2, height - 2
     buffer = [' ' * width] * height
+    cursor: tuple[int, int] | None = None
 
     @staticmethod
     def refresh() -> None:
@@ -193,10 +196,21 @@ class Term:
 
     @staticmethod
     def draw() -> None:
-        if DEBUG:
-            print(Term.hide_cursor_code, '\n'.join(Term.buffer), sep='', end='')
-        else:
-            print(Term.reset_pos_code, Term.hide_cursor_code, '\n'.join(Term.buffer), sep='', end='')
+        print('' if DEBUG else Term.reset_pos_code,
+              '\n'.join(Term.buffer),
+              Term.hide_cursor_code if Term.cursor is None else (
+                      Term.show_cursor_code +
+                      f'\033[{Term.cursor[0]};{Term.cursor[1]}H'),
+              sep='', end='', flush=True)
+        Term.cursor = None
+
+    @staticmethod
+    def set_cursor(y: int, x: int) -> None:
+        if y < 0:
+            y = Term.in_height + y
+        if x < 0:
+            x = Term.in_width + x
+        Term.cursor = (y + 1, x + 1)
 
     @staticmethod
     def _prepare_text(text: insertion_any_form) -> list[tuple[str, int]]:
@@ -221,6 +235,7 @@ class Term:
             y = (Term.in_height - len(text)) // 2 + 1
         if y < 0:
             y = Term.in_height + y
+        y += 1
         for i in range(len(text)):
             line = text[i][0]
             line_width = text[i][1]
@@ -413,6 +428,7 @@ def add_print():
         for i in range(len(filtered)):
             Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} '
                         + filtered[i][0] + ' - ' + filtered[i][1].translation, -5 - i)
+    Term.set_cursor(-2, len(State.parameter) + 5)
 
 
 def add_handle(k: Key):
