@@ -154,18 +154,18 @@ class RecordEncoder(json.JSONEncoder):
 
 
 class DB:
-    db: dict[str, Record] = {}
+    data: dict[str, Record] = {}
 
     @staticmethod
     def load() -> None:
         with open('db.json', 'r', encoding='utf-8') as db_file:
             db_raw = json.load(db_file)
-        DB.db = {k: Record(v['translation'], v['rate']) for k, v in db_raw.items()}
+        DB.data = {k: Record(v['translation'], v['rate']) for k, v in db_raw.items()}
 
     @staticmethod
     def dump() -> None:
         with open('db.json', 'w', encoding='utf-8') as db_file:
-            json.dump(DB.db, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
+            json.dump(DB.data, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
 
 
 class Term:
@@ -330,11 +330,10 @@ class State:
         REVERSE = 1
 
     state = Enum.MENU
-    parameter = None
+    parameter: None | str | dict = None
     input = ''
     scroll_mode = Direction.STRAIGHT
     explore_mode = Direction.STRAIGHT
-    selection = -1
     cursor_index = -1
     scroll_reveal = False
     first_time = False
@@ -383,7 +382,11 @@ def menu_handle(k: Key):
             State.parameter = ''
             State.state = State.Enum.ADD
         elif k == 'e':
-            State.parameter = ['', None]
+            State.parameter = {
+                'promt': '',
+                'filtered': [],
+                'selection': -1
+            }
             State.state = State.Enum.EXPLORE
         elif k == Key.Special.ENTER:
             State.parameter = ''
@@ -424,7 +427,7 @@ def add_print():
         token = State.parameter.lower()
         if ' - ' in token:
             token = token[:token.index(' - ')]
-        filtered = sorted(filter(lambda item: token in item[0].lower(), DB.db.items()), reverse=True)[:9]
+        filtered = sorted(filter(lambda item: token in item[0].lower(), DB.data.items()), reverse=True)[:9]
         for i in range(len(filtered)):
             Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} '
                         + filtered[i][0] + ' - ' + filtered[i][1].translation, -5 - i)
@@ -439,7 +442,7 @@ def add_handle(k: Key):
         if ' - ' in State.parameter:
             key, val = State.parameter.split(' - ', 1)
             val = Record(val)
-            DB.db[key] = val
+            DB.data[key] = val
             DB.dump()
             phrase = Style.BRIGHT_BLUE + State.parameter[:State.parameter.index(" - ")] + Style.DEFAULT
             State.parameter = f'Phrase {phrase} is successfully added'
@@ -477,27 +480,21 @@ def add_handle(k: Key):
 
 
 def explore_print():
-    Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter[0], y=-3)
+    Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter['promt'], y=-3)
     if State.scroll_mode == State.Direction.STRAIGHT:
         tip = Style.BRIGHT_BLUE + 'Search'
     else:
         tip = Style.GREEN + 'Поиск'
     Term.insert('    ' + tip + Style.BRIGHT_BLACK + '  [Tab] to swap' + Style.DEFAULT, y=-2)
 
-    if State.parameter[0] != '':
-        filtered = sorted(filter(lambda s: State.parameter[0].lower() in s[0].lower() + s[1].translation.lower(),
-                                 DB.db.items()),
-                          reverse=True)[:9]
-        if State.selection >= len(filtered):
-            State.selection = len(filtered) - 1
-        for i in range(len(filtered)):
-            num_color = Style.GREEN if i == State.selection else Style.BRIGHT_BLACK
-            line = f'{num_color}[{i + 1}]{Style.DEFAULT} {filtered[i][0]} - {filtered[i][1].translation}'
-            if i == State.selection:
-                line = Style.from_hex('#333', True) + line + ' ' + Style.DEFAULT_BG
-            Term.insert(line, -5 - i)
-    else:
-        State.selection = -1
+    for i in range(len(State.parameter['filtered'])):
+        bullet_color = Style.GREEN if i == State.parameter['selection'] else Style.BRIGHT_BLACK
+        line = (f'{bullet_color}  • {Style.DEFAULT}{State.parameter["filtered"][i][0]}'
+                ' - '
+                f'{State.parameter["filtered"][i][1].translation}')
+        if i == State.parameter['selection']:
+            line = Style.from_hex('#333', True) + line + ' ' + Style.DEFAULT_BG
+        Term.insert(line, -5 - i)
 
     if State.first_time:
         Term.insert('    '
@@ -507,44 +504,60 @@ def explore_print():
 
 
 def explore_handle(k: Key):
+    update_filtered = False
     if k == '/':
         State.state = State.Enum.MENU
         State.parameter = None
     elif k == Key.Special.ARROW_UP:
-        if State.selection < 8:
-            State.selection += 1
+        if State.parameter['selection'] < len(State.parameter['filtered']) - 1:
+            State.parameter['selection'] += 1
     elif k == Key.Special.ARROW_DOWN:
-        if State.selection > -1:
-            State.selection -= 1
-    elif State.selection == -1:
+        if State.parameter['selection'] > -1:
+            State.parameter['selection'] -= 1
+    elif State.parameter['selection'] == -1:
         if k == Key.Special.TAB:
-            State.scroll_mode = 1 - State.scroll_mode
-            State.parameter = ['', None]
+            State.explore_mode = 1 - State.explore_mode
+            State.parameter['promt'] = ''
+            State.parameter['selection'] = -1
+            update_filtered = True
         elif k == Key.Special.BACKSPACE:
-            if State.parameter[0]:
-                State.parameter[0] = State.parameter[0][:-1]
+            if State.parameter['promt']:
+                State.parameter['promt'] = State.parameter['promt'][:-1]
+                update_filtered = True
         else:
-            if State.scroll_mode == State.Direction.REVERSE and k in en2ru:
-                State.parameter[0] += en2ru[k]
+            if State.explore_mode == State.Direction.REVERSE and k in en2ru:
+                State.parameter['promt'] += en2ru[k]
             else:
-                State.parameter[0] += str(k)
+                State.parameter['promt'] += str(k)
+            update_filtered = True
     else:
         if k == 'd':
-            DB.db.pop(State.parameter[1])
-            DB.dump()
-            State.parameter[0] = ''
+            del State.parameter['filtered'][State.parameter['selection']]
+            update_filtered = True
+            # DB.dump()
         elif k == 'e':
-            State.state = State.Enum.EDIT
-            State.parameter = State.parameter
+            pass
         elif k == 'r':
-            State.selection = -1
+            State.parameter['selection'] = -1
+    if update_filtered:
+        if State.parameter['promt']:
+            State.parameter['filtered'] = sorted(
+                filter(
+                    lambda s: State.parameter['promt'].lower() in s[0].lower() + s[1].translation.lower(),
+                    DB.data.items()),
+                reverse=True)[:Term.in_height - 5]
+        else:
+            State.parameter['filtered'] = []
+            State.parameter['selection'] = -1
+        if State.parameter['selection'] >= len(State.parameter['filtered']):
+            State.parameter['selection'] = len(State.parameter['filtered']) - 1
 
 
 def scroll_print():
     if State.scroll_reveal:
         phrase = State.parameter
     else:
-        items = DB.db.items()
+        items = DB.data.items()
         rate_sum = 0
         for item in items:
             rate_sum += item[1].rate
