@@ -501,6 +501,8 @@ def explore_print():
                     f'{Style.RED}[D]{Style.DEFAULT}elete, '
                     f'{Style.GREEN}[E]{Style.DEFAULT}dit, '
                     f'{Style.GREEN}[R]{Style.DEFAULT}eset selection', -5)
+    elif State.parameter['selection'] == -1:
+        Term.set_cursor(-2, len(State.parameter['promt']) + 5)
 
 
 def explore_handle(k: Key):
@@ -532,9 +534,8 @@ def explore_handle(k: Key):
             update_filtered = True
     else:
         if k == 'd':
-            del State.parameter['filtered'][State.parameter['selection']]
+            del DB.data[State.parameter['filtered'][State.parameter['selection']][0]]
             update_filtered = True
-            # DB.dump()
         elif k == 'e':
             pass
         elif k == 'r':
