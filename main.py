@@ -2,7 +2,7 @@ import os
 import json
 from dataclasses import dataclass
 import random
-from typing import NewType, Union
+from typing import NewType, Union, Any
 from msvcrt import getch
 
 DEBUG = False
@@ -330,7 +330,7 @@ class State:
         REVERSE = 1
 
     state = Enum.MENU
-    parameter: None | str | dict = None
+    parameter: Any = {}
     input = ''
     scroll_mode = Direction.STRAIGHT
     explore_mode = Direction.STRAIGHT
@@ -544,7 +544,7 @@ def explore_handle(k: Key):
             update_filtered = True
             DB.dump()
         elif k == 'e':
-            pass
+            State.state = State.Enum.EDIT
         elif k == 'r':
             State.parameter['selection'] = -1
     if update_filtered:
@@ -559,6 +559,49 @@ def explore_handle(k: Key):
             State.parameter['selection'] = -1
         if State.parameter['selection'] >= len(State.parameter['filtered']):
             State.parameter['selection'] = len(State.parameter['filtered']) - 1
+
+
+def edit_print():
+    first_time = 'mod' not in State.parameter
+    if first_time:
+        phrase = State.parameter['filtered'][State.parameter['selection']]
+        State.parameter['mod'] = [phrase[0], phrase[1].translation]
+        State.parameter['cursor'] = len(phrase[0]) + 3 + len(phrase[1].translation)
+
+    Term.insert(Style.BRIGHT_BLACK + '  ⮞ ' + State.parameter['promt'] + Style.DEFAULT, y=-3)
+    if State.scroll_mode == State.Direction.STRAIGHT:
+        tip = Style.BRIGHT_BLUE + 'Search'
+    else:
+        tip = Style.GREEN + 'Поиск'
+    Term.insert('    ' + Style.BRIGHT_BLACK + tip + Style.DEFAULT, y=-2)
+
+    for i in range(len(State.parameter['filtered'])):
+        if State.parameter['selection'] == i:
+            line = (f'{Style.GREEN}  • {Style.BRIGHT_BLUE}{State.parameter["filtered"][i][0]}{Style.DEFAULT}'
+                    ' - '
+                    f'{Style.GREEN}{State.parameter["filtered"][i][1].translation}{Style.DEFAULT}')
+        else:
+            line = (f'{Style.BRIGHT_BLACK}  • {State.parameter["filtered"][i][0]}'
+                    ' - '
+                    f'{State.parameter["filtered"][i][1].translation}{Style.DEFAULT}')
+        Term.insert(line, -5 - i)
+
+    Term.set_cursor(-4 - State.parameter['selection'], State.parameter['cursor'] + 5)
+
+
+def edit_handle(k: Key):
+    if k == '/':
+        del State.parameter['mod']
+        del State.parameter['cursor']
+        State.state = State.Enum.EXPLORE
+    elif k == Key.Special.ENTER:
+        del State.parameter['mod']
+        del State.parameter['cursor']
+        State.state = State.Enum.EXPLORE
+    elif k == Key.Special.BACKSPACE:
+        if State.parameter['mod']:
+            State.parameter['mod'] = State.parameter['mod'][:-1]
+        # if State.parameter['mod'] == 'to ':
 
 
 def scroll_print():
@@ -615,6 +658,7 @@ def main():
         State.Enum.MENU: LogicBlock(menu_print, menu_handle),
         State.Enum.ADD: LogicBlock(add_print, add_handle),
         State.Enum.EXPLORE: LogicBlock(explore_print, explore_handle),
+        State.Enum.EDIT: LogicBlock(edit_print, edit_handle),
         State.Enum.SCROLL: LogicBlock(scroll_print, scroll_handle)
     }
 
