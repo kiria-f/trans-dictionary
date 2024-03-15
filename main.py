@@ -536,6 +536,7 @@ def explore_handle(k: Key):
         if k == 'd':
             del DB.data[State.parameter['filtered'][State.parameter['selection']][0]]
             update_filtered = True
+            DB.dump()
         elif k == 'e':
             pass
         elif k == 'r':
