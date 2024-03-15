@@ -336,7 +336,6 @@ class State:
     explore_mode = Direction.STRAIGHT
     cursor_index = -1
     scroll_reveal = False
-    first_time = False
 
 
 MENU = [
@@ -370,43 +369,42 @@ class LogicBlock:
 
 def menu_print():
     Term.insert(MENU, align_center=True)
-    if State.parameter is not None:
-        Term.insert(State.parameter, -2, True)
-    if not State.first_time:
+    if State.parameter is None:
         Term.insert(f'{Style.GREEN}[/]{Style.DEFAULT} Back to menu from anywhere', -2, True)
+    elif State.parameter:
+        Term.insert(State.parameter, -2, True)
 
 
 def menu_handle(k: Key):
-    if State.state == State.Enum.MENU:
-        if k == 'a':
-            State.parameter = ''
-            State.state = State.Enum.ADD
-        elif k == 'e':
-            State.parameter = {
-                'promt': '',
-                'filtered': [],
-                'selection': -1
-            }
-            State.state = State.Enum.EXPLORE
-        elif k == Key.Special.ENTER:
-            State.parameter = ''
-            State.first_time = True
-            State.state = State.Enum.SCROLL
-        elif k == 'r':
-            Term.refresh()
-            State.parameter = ''
-        elif k == 'q':
-            State.state = State.Enum.QUIT
-        else:
-            message = (Style.RED + 'Unknown: ' +
-                       Style.BRIGHT_BLACK + '[' +
-                       Style.DEFAULT + k.force_str() + (' ' if k in (k.Special.BACKSPACE,) else '') +
-                       Style.BRIGHT_BLACK + ']' +
-                       Style.DEFAULT)
-            State.parameter = message
+    state_change = True
+    if k == 'a':
+        State.state = State.Enum.ADD
+    elif k == 'e':
+        State.state = State.Enum.EXPLORE
+    elif k == Key.Special.ENTER:
+        State.first_time = True
+        State.state = State.Enum.SCROLL
+    elif k == 'r':
+        Term.refresh()
+        state_change = False
+    elif k == 'q':
+        State.state = State.Enum.QUIT
+    else:
+        State.parameter = (Style.RED + 'Unknown: ' +
+                           Style.BRIGHT_BLACK + '[' +
+                           Style.DEFAULT + k.force_str() + (' ' if k in (k.Special.BACKSPACE,) else '') +
+                           Style.BRIGHT_BLACK + ']' +
+                           Style.DEFAULT)
+        state_change = False
+
+    if state_change:
+        State.parameter = None
 
 
 def add_print():
+    if State.parameter is None:
+        State.parameter = ''
+
     Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter, y=-3)
     tip = 'Phrase'[:len(State.parameter)]
     if ' - ' in State.parameter:
@@ -480,6 +478,14 @@ def add_handle(k: Key):
 
 
 def explore_print():
+    first_time = State.parameter is None
+    if first_time:
+        State.parameter = {
+            'promt': '',
+            'filtered': [],
+            'selection': -1
+        }
+
     Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter['promt'], y=-3)
     if State.scroll_mode == State.Direction.STRAIGHT:
         tip = Style.BRIGHT_BLUE + 'Search'
@@ -496,7 +502,7 @@ def explore_print():
             line = Style.from_hex('#333', True) + line + ' ' + Style.DEFAULT_BG
         Term.insert(line, -5 - i)
 
-    if State.first_time:
+    if first_time:
         Term.insert('    '
                     f'{Style.RED}[D]{Style.DEFAULT}elete, '
                     f'{Style.GREEN}[E]{Style.DEFAULT}dit, '
@@ -556,6 +562,10 @@ def explore_handle(k: Key):
 
 
 def scroll_print():
+    first_time = State.parameter is None
+    if first_time:
+        State.parameter = ''
+
     if State.scroll_reveal:
         phrase = State.parameter
     else:
@@ -571,7 +581,7 @@ def scroll_print():
                 break
             rnd -= item[1].rate
     Term.insert(phrase[0], Term.in_height // 2, True)
-    if State.first_time:
+    if first_time:
         Term.insert(
             f'{Style.GREEN}[\']{Style.DEFAULT} Reveal, '
             f'{Style.GREEN}[Enter]{Style.DEFAULT} Scroll next',
