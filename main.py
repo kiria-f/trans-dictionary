@@ -1,9 +1,10 @@
+import sys
 import os
 import json
 from dataclasses import dataclass
 import random
 from typing import NewType, Union, Any
-from msvcrt import getch
+import msvcrt
 
 DEBUG = False
 
@@ -23,30 +24,68 @@ en2ru = {e: r for e, r in zip(en_keyboard, ru_keyboard)}
 ru2en = {r: e for e, r in zip(en_keyboard, ru_keyboard)}
 
 
-def visible_len(line: str) -> int:
-    vl = 0
-    i = 0
-    while i < len(line):
-        if line[i] == '\033':
-            while line[i] != 'm':
-                i += 1
-        else:
-            vl += 1
-        i += 1
-    return vl
-
-
-def visible_index(line: str, index: int) -> int:
-    vi = 0
-    i = 0
-    while i < index:
-        if line[vi] == '\033':
-            while line[vi] != 'm':
-                vi += 1
-        else:
+class StrTool:
+    @staticmethod
+    def visible_len(line: str) -> int:
+        vl = 0
+        i = 0
+        while i < len(line):
+            if line[i] == '\033':
+                while line[i] != 'm':
+                    i += 1
+            else:
+                vl += 1
             i += 1
-        vi += 1
-    return vi - 1
+        return vl
+
+    @staticmethod
+    def visible_index(line: str, index: int) -> int:
+        vi = 0
+        i = 0
+        while i < index:
+            if line[vi] == '\033':
+                while line[vi] != 'm':
+                    vi += 1
+            else:
+                i += 1
+            vi += 1
+        return vi - 1
+
+    @staticmethod
+    def format(
+            line: str,
+            final: bool = False,
+            colorize: bool = False,
+            palette: dict[str, str] | None = None) -> str:
+        if palette is None:
+            palette = {
+                'phrase': Style.BRIGHT_BLUE,
+                'delim': Style.DEFAULT,
+                'translation': Style.GREEN
+            }
+        line = line.lower()
+        deline = line.split()
+        if len(deline) > 0:
+            if deline[0] == 'to ' and len(deline) > 1:
+                deline[1] = deline[1].capitalize()
+            else:
+                deline[0] = deline[0].capitalize()
+            if colorize:
+                deline[0] = palette['phrase'] + deline[0]
+        delim = '-'
+        if delim in deline:
+            delim_index = deline.index(delim)
+            while deline.count(delim) > 1:
+                next_index = deline.index(delim, delim_index + 1)
+                deline.pop(next_index)
+            if colorize:
+                deline[delim_index] = palette['delim'] + delim
+            tr_index = delim_index + 1
+            if tr_index < len(deline):
+                deline[tr_index] = deline[tr_index].capitalize()
+                if colorize:
+                    deline[tr_index] = palette['translation'] + deline[tr_index]
+        return ' '.join(deline)
 
 
 class Key:
@@ -106,36 +145,6 @@ class Key:
         return self.printable
 
 
-def getch_nt() -> Key:
-    b = getch()
-    if b == b'\r':
-        return Key(Key.Special.ENTER)
-    if b == b'\x08':
-        return Key(Key.Special.BACKSPACE)
-    if b == b'\\':
-        return Key('\\')
-    if b == b'\t':
-        return Key(Key.Special.TAB)
-    if b == b'\x1b':
-        return Key(Key.Special.ESC)
-    if b == b'\xe0':
-        b = getch()
-        if b == b'H':
-            return Key(Key.Special.ARROW_UP)
-        if b == b'P':
-            return Key(Key.Special.ARROW_DOWN)
-        if b == b'K':
-            return Key(Key.Special.ARROW_LEFT)
-        if b == b'M':
-            return Key(Key.Special.ARROW_RIGHT)
-    return Key(str(b)[2:-1])
-
-
-def getch_unix() -> Key:
-    b = os.read(0, 1)
-    return Key(str(b)[2:-1])
-
-
 @dataclass
 class Record:
     translation: str
@@ -182,8 +191,12 @@ class Term:
     cursor: tuple[int, int] | None = None
 
     @staticmethod
-    def refresh() -> None:
+    def clear():
         os.system('cls' if os.name == 'nt' else 'clear')
+
+    @staticmethod
+    def refresh() -> None:
+        Term.clear()
         Term.width, Term.height = os.get_terminal_size()
         Term.in_width, Term.in_height = Term.width - 2, Term.height - 2
 
@@ -215,14 +228,14 @@ class Term:
     @staticmethod
     def _prepare_text(text: insertion_any_form) -> list[tuple[str, int]]:
         if isinstance(text, str):
-            return [(text, visible_len(text))]
+            return [(text, StrTool.visible_len(text))]
         if isinstance(text, tuple) and len(text) == 2 and isinstance(text[1], int):
             return [(text[0], text[1])]
         if isinstance(text, tuple) or isinstance(text, list):
             text_mod = []
             for line in text:
                 if isinstance(line, str):
-                    text_mod.append((line, visible_len(line)))
+                    text_mod.append((line, StrTool.visible_len(line)))
                 elif isinstance(line, tuple) and len(line) == 2 and isinstance(line[1], int):
                     text_mod.append(line)
             return text_mod
@@ -244,10 +257,39 @@ class Term:
                 line = ' ' * x + line + ' ' * (Term.in_width - x - line_width)
             else:
                 line += ' ' * (Term.in_width - line_width)
-            v_len = visible_len(line)
+            v_len = StrTool.visible_len(line)
             if v_len > Term.in_width:
-                line = line[:visible_index(line, Term.in_width)] + '…'
+                line = line[:StrTool.visible_index(line, Term.in_width)] + '…'
             Term.buffer[y + i] = '│' + line + '│'
+
+    @staticmethod
+    def getch() -> Key:
+        if os.name == 'nt':
+            b = msvcrt.getch()
+            if b == b'\r':
+                return Key(Key.Special.ENTER)
+            if b == b'\x08':
+                return Key(Key.Special.BACKSPACE)
+            if b == b'\\':
+                return Key('\\')
+            if b == b'\t':
+                return Key(Key.Special.TAB)
+            if b == b'\x1b':
+                return Key(Key.Special.ESC)
+            if b == b'\xe0':
+                b = msvcrt.getch()
+                if b == b'H':
+                    return Key(Key.Special.ARROW_UP)
+                if b == b'P':
+                    return Key(Key.Special.ARROW_DOWN)
+                if b == b'K':
+                    return Key(Key.Special.ARROW_LEFT)
+                if b == b'M':
+                    return Key(Key.Special.ARROW_RIGHT)
+            return Key(str(b)[2:-1])
+        else:
+            b = os.read(0, 1)
+            return Key(str(b)[2:-1])
 
 
 class Style:
@@ -565,8 +607,8 @@ def edit_print():
     first_time = 'mod' not in State.parameter
     if first_time:
         phrase = State.parameter['filtered'][State.parameter['selection']]
-        State.parameter['mod'] = [phrase[0], phrase[1].translation]
-        State.parameter['cursor'] = len(phrase[0]) + 3 + len(phrase[1].translation)
+        State.parameter['mod'] = phrase[0] + ' - ' + phrase[1].translation
+        State.parameter['cursor'] = len(State.parameter['mod'])
 
     Term.insert(Style.BRIGHT_BLACK + '  ⮞ ' + State.parameter['promt'] + Style.DEFAULT, y=-3)
     if State.scroll_mode == State.Direction.STRAIGHT:
@@ -577,16 +619,16 @@ def edit_print():
 
     for i in range(len(State.parameter['filtered'])):
         if State.parameter['selection'] == i:
-            line = (f'{Style.GREEN}  • {Style.BRIGHT_BLUE}{State.parameter["filtered"][i][0]}{Style.DEFAULT}'
-                    ' - '
-                    f'{Style.GREEN}{State.parameter["filtered"][i][1].translation}{Style.DEFAULT}')
+            line = '  • ' + StrTool.format(State.parameter['mod'], colorize=True)
         else:
-            line = (f'{Style.BRIGHT_BLACK}  • {State.parameter["filtered"][i][0]}'
-                    ' - '
-                    f'{State.parameter["filtered"][i][1].translation}{Style.DEFAULT}')
+            line = Style.BRIGHT_BLACK + '  • ' + StrTool.format(
+                State.parameter["filtered"][i][0] +
+                ' - ' +
+                State.parameter["filtered"][i][1].translation + Style.DEFAULT)
         Term.insert(line, -5 - i)
 
-    Term.set_cursor(-4 - State.parameter['selection'], State.parameter['cursor'] + 5)
+    cursor = State.parameter['cursor']
+    Term.set_cursor(-4 - State.parameter['selection'], cursor + 5)
 
 
 def edit_handle(k: Key):
@@ -595,13 +637,52 @@ def edit_handle(k: Key):
         del State.parameter['cursor']
         State.state = State.Enum.EXPLORE
     elif k == Key.Special.ENTER:
+        old_val = DB.data.pop(State.parameter['filtered'][State.parameter['selection']][0])
+        kvp = State.parameter['mod'].split(' - ', 1)
+        DB.data[kvp[0]] = Record(kvp[1], old_val.rate)
+        DB.dump()
+
+        if State.parameter['promt']:
+            State.parameter['filtered'] = sorted(
+                filter(
+                    lambda s: State.parameter['promt'].lower() in s[0].lower() + s[1].translation.lower(),
+                    DB.data.items()),
+                reverse=True)[:Term.in_height - 5]
+        else:
+            State.parameter['filtered'] = []
+            State.parameter['selection'] = -1
+        if State.parameter['selection'] >= len(State.parameter['filtered']):
+            State.parameter['selection'] = len(State.parameter['filtered']) - 1
+
         del State.parameter['mod']
         del State.parameter['cursor']
         State.state = State.Enum.EXPLORE
     elif k == Key.Special.BACKSPACE:
         if State.parameter['mod']:
-            State.parameter['mod'] = State.parameter['mod'][:-1]
-        # if State.parameter['mod'] == 'to ':
+            cursor = State.parameter['cursor']
+            State.parameter['mod'] = State.parameter['mod'][:cursor - 1] + State.parameter['mod'][cursor:]
+            State.parameter['cursor'] -= 1
+    elif k == Key.Special.ARROW_LEFT:
+        if State.parameter['cursor'] > 0:
+            if ' - ' in State.parameter['mod'] and State.parameter['mod'].index(' - ') == State.parameter['cursor'] - 3:
+                State.parameter['cursor'] -= 3
+            else:
+                State.parameter['cursor'] -= 1
+    elif k == Key.Special.ARROW_RIGHT:
+        if State.parameter['cursor'] < len(State.parameter['mod']):
+            if ' - ' in State.parameter['mod'] and State.parameter['mod'].index(' - ') == State.parameter['cursor']:
+                State.parameter['cursor'] += 3
+            else:
+                State.parameter['cursor'] += 1
+    else:
+        if ' - ' in State.parameter['mod'] and State.parameter['cursor'] >= State.parameter['mod'].index(' - ') + 3:
+            c = en2ru[k]
+        else:
+            c = str(k)
+        State.parameter['mod'] = State.parameter['mod'][:State.parameter['cursor']] + \
+            c + \
+            State.parameter['mod'][State.parameter['cursor']:]
+        State.parameter['cursor'] += 1
 
 
 def scroll_print():
@@ -653,7 +734,7 @@ def scroll_handle(k: Key):
 def main():
     DB.load()
     if not DEBUG:
-        os.system('cls' if os.name == 'nt' else 'clear')
+        Term.clear()
     logic = {
         State.Enum.MENU: LogicBlock(menu_print, menu_handle),
         State.Enum.ADD: LogicBlock(add_print, add_handle),
@@ -668,18 +749,22 @@ def main():
     while State.state != State.Enum.QUIT:
         logic[State.state].printer()
         Term.draw()
-        if os.name == 'nt':
-            c = getch_nt()
-        else:
-            c = getch_unix()
+        c = Term.getch()
         State.first_time = State.state == State.Enum.MENU
         logic[State.state].handler(c)
         Term.reset()
 
     print(Style.RESET, end='')
     if not DEBUG:
-        os.system('cls' if os.name == 'nt' else 'clear')
+        Term.clear()
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        Term.clear()
+        print(Style.RED + 'Error: ' + Style.DEFAULT)
+        print(e)
+        print('Press any key to exit...')
+        Term.getch()
