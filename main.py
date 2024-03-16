@@ -66,7 +66,7 @@ class StrTool:
         line = line.lower()
         deline = line.split()
         if len(deline) > 0:
-            if deline[0] == 'to ' and len(deline) > 1:
+            if deline[0] == 'to' and len(deline) > 1:
                 deline[1] = deline[1].capitalize()
             else:
                 deline[0] = deline[0].capitalize()
@@ -97,6 +97,8 @@ class Key:
         ESC = 4
         SHIFT = 5
         CTRL = 6
+        HOME = 7
+        END = 8
         ARROW_UP = 10
         ARROW_DOWN = 11
         ARROW_LEFT = 12
@@ -112,6 +114,8 @@ class Key:
         Special.ESC: '⎋',
         Special.SHIFT: '⇧',
         Special.CTRL: '⌃',
+        Special.HOME: '↖',
+        Special.END: '↘',
         Special.ARROW_UP: '↑',
         Special.ARROW_DOWN: '↓',
         Special.ARROW_LEFT: '←',
@@ -286,6 +290,12 @@ class Term:
                     return Key(Key.Special.ARROW_LEFT)
                 if b == b'M':
                     return Key(Key.Special.ARROW_RIGHT)
+            if b == b'\x00':
+                b = msvcrt.getch()
+                if b == b'G':
+                    return Key(Key.Special.HOME)
+                if b == b'O':
+                    return Key(Key.Special.END)
             return Key(str(b)[2:-1])
         else:
             b = os.read(0, 1)
@@ -674,6 +684,10 @@ def edit_handle(k: Key):
                 State.parameter['cursor'] += 3
             else:
                 State.parameter['cursor'] += 1
+    elif k == Key.Special.HOME:
+        State.parameter['cursor'] = 0
+    elif k == Key.Special.END:
+        State.parameter['cursor'] = len(State.parameter['mod'])
     else:
         if ' - ' in State.parameter['mod'] and State.parameter['cursor'] >= State.parameter['mod'].index(' - ') + 3:
             c = en2ru[k]
