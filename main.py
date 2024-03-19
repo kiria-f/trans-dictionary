@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import random
 from typing import NewType, Union, Any
 import msvcrt
+import traceback
 
 DEBUG = False
 
@@ -387,7 +388,6 @@ class State:
     scroll_mode = Direction.STRAIGHT
     explore_mode = Direction.STRAIGHT
     cursor_index = -1
-    scroll_reveal = False
 
 
 MENU = [
@@ -693,56 +693,71 @@ def edit_handle(k: Key):
             c = en2ru[k]
         else:
             c = str(k)
-        State.parameter['mod'] = State.parameter['mod'][:State.parameter['cursor']] + \
-            c + \
-            State.parameter['mod'][State.parameter['cursor']:]
+        State.parameter['mod'] = (
+                State.parameter['mod'][:State.parameter['cursor']] +
+                c +
+                State.parameter['mod'][State.parameter['cursor']:])
         State.parameter['cursor'] += 1
 
 
 def scroll_print():
     first_time = State.parameter is None
-    if first_time:
-        State.parameter = ''
-
-    if State.scroll_reveal:
-        phrase = State.parameter
-    else:
-        items = DB.data.items()
-        rate_sum = 0
-        for item in items:
-            rate_sum += item[1].rate
-        rnd = random.random() * rate_sum
-        phrase: None | tuple[str, Record] = None
-        for item in items:
-            if rnd < item[1].rate:
-                phrase = item
-                break
-            rnd -= item[1].rate
-    Term.insert(phrase[0], Term.in_height // 2, True)
-    if first_time:
+    if first_time or not State.parameter['record']:
+        State.parameter = {
+            'phrase': '',
+            'record': None,
+            'reveal': False
+        }
         Term.insert(
-            f'{Style.GREEN}[\']{Style.DEFAULT} Reveal, '
-            f'{Style.GREEN}[Enter]{Style.DEFAULT} Scroll next',
-            Term.in_height // 2 + 2,
+            f'{Style.GREEN}[Enter]{Style.DEFAULT} Scroll next / Correct',
+            Term.in_height // 2 - 1,
             True)
-    if State.scroll_reveal:
-        Term.insert(Style.YELLOW + phrase[1].translation + Style.DEFAULT, Term.in_height // 2 + 2, True)
-    State.parameter = phrase
+        Term.insert(
+            f'{Style.GREEN}[\']{Style.DEFAULT} Incorrect',
+            Term.in_height // 2 + 1,
+            True)
+        return
+
+    Term.insert(State.parameter['phrase'], Term.in_height // 2, True)
+    if State.parameter['reveal']:
+        Term.insert(Style.YELLOW + State.parameter['record'].translation + Style.DEFAULT, Term.in_height // 2 + 2, True)
+
+
+def get_new_phrase():
+    items = DB.data.items()
+    rate_sum = 0
+    for item in items:
+        rate_sum += item[1].rate
+    rnd = random.random() * rate_sum
+    for item in items:
+        if rnd < item[1].rate:
+            break
+        rnd -= item[1].rate
+    State.parameter = {
+        'phrase': item[0],
+        'record': item[1],
+        'reveal': False
+    }
 
 
 def scroll_handle(k: Key):
     if k == '/':
         State.state = State.Enum.MENU
-        State.parameter = None
-    elif k == '\n':
-        if not State.scroll_reveal:
-            State.parameter[1].rate *= 0.75
-        DB.dump()
-        State.scroll_reveal = False
+        State.parameter = State.parameter['phrase']
+    elif k == Key.Special.ENTER:
+        if not State.parameter['reveal'] and State.parameter['record']:
+            State.parameter['reveal'] = True
+        else:
+            if State.parameter['record']:
+                State.parameter['record'].rate *= 0.75
+                DB.dump()
+            get_new_phrase()
     elif k == "'":
-        State.parameter[1].rate *= 1.25
-        DB.dump()
-        State.scroll_reveal = True
+        if State.parameter['reveal'] and State.parameter['record']:
+            State.parameter['record'].rate *= 1.25
+            DB.dump()
+            State.parameter['reveal'] = True
+            get_new_phrase()
 
 
 def main():
@@ -778,7 +793,7 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         Term.clear()
-        print(Style.RED + 'Error: ' + Style.DEFAULT)
-        print(e)
-        print('Press any key to exit...')
+        print(Style.RED + 'Error: \n' + Style.BRIGHT_BLACK)
+        traceback.print_exception(e)
+        print(Style.DEFAULT + '\nPress any key to exit...')
         Term.getch()
