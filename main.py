@@ -710,7 +710,7 @@ def scroll_print():
             'reveal': False
         }
         Term.insert(
-            f'{Style.GREEN}[Enter]{Style.DEFAULT} Scroll next / Correct',
+            f'{Style.GREEN}[Enter]{Style.DEFAULT} Show translation / Correct / Scroll next',
             Term.in_height // 2 - 1,
             True)
         Term.insert(
@@ -744,7 +744,7 @@ def get_new_phrase():
 def scroll_handle(k: Key):
     if k == '/':
         State.state = State.Enum.MENU
-        State.parameter = State.parameter['phrase']
+        State.parameter = None
     elif k == Key.Special.ENTER:
         if not State.parameter['reveal'] and State.parameter['record']:
             State.parameter['reveal'] = True
