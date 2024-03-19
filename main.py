@@ -86,6 +86,8 @@ class StrTool:
                 deline[tr_index] = deline[tr_index].capitalize()
                 if colorize:
                     deline[tr_index] = palette['translation'] + deline[tr_index]
+        if colorize:
+            deline[-1] += Style.DEFAULT
         return ' '.join(deline)
 
 
@@ -508,7 +510,7 @@ def add_handle(k: Key):
         if ' - ' in State.parameter:
             if State.parameter[-1] == '░':
                 State.parameter = State.parameter[:-1]
-                if k in (',', '.', ';'):
+                if k in (',', '.', ';', ':', '!', '?'):
                     State.parameter += str(k)
             elif k in en2ru:
                 if State.parameter.index(' - ') == len(State.parameter) - 3:
@@ -550,7 +552,8 @@ def explore_print():
         line = (f'  {bullet_color}•{Style.DEFAULT} {State.parameter["filtered"][i][0]}'
                 ' - '
                 f'{State.parameter["filtered"][i][1].translation}'
-                f' {Style.BRIGHT_BLACK}[{State.parameter["filtered"][i][1].rate}]')
+                f' {Style.BRIGHT_BLACK}[{State.parameter["filtered"][i][1].rate}]'
+                f' {Style.DEFAULT}')
         if i == State.parameter['selection']:
             line = Style.from_hex('#333', True) + line + ' ' + Style.DEFAULT_BG
         Term.insert(line, -5 - i)
@@ -690,15 +693,23 @@ def edit_handle(k: Key):
     elif k == Key.Special.END:
         State.parameter['cursor'] = len(State.parameter['mod'])
     else:
-        if ' - ' in State.parameter['mod'] and State.parameter['cursor'] >= State.parameter['mod'].index(' - ') + 3:
-            c = en2ru[k]
+        replace_prev = False
+        if k == '\\':
+            c = '░'
+        elif State.parameter['cursor'] > 0 and State.parameter['mod'][State.parameter['cursor'] - 1] == '░':
+            c = str(k)
+            if c not in (',', '.', ';', ':', '!', '?'):
+                c = ''
+            replace_prev = True
+        elif ' - ' in State.parameter['mod'] and State.parameter['cursor'] >= State.parameter['mod'].index(' - ') + 3:
+            c = en2ru[k] if k in en2ru else str(k)
         else:
             c = str(k)
         State.parameter['mod'] = (
-                State.parameter['mod'][:State.parameter['cursor']] +
+                State.parameter['mod'][:State.parameter['cursor'] - replace_prev] +
                 c +
                 State.parameter['mod'][State.parameter['cursor']:])
-        State.parameter['cursor'] += 1
+        State.parameter['cursor'] += len(c) - replace_prev
 
 
 def scroll_print():
