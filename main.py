@@ -97,11 +97,12 @@ class Key:
         ENTER = 1
         BACKSPACE = 2
         TAB = 3
-        ESC = 4
+        ESCAPE = 4
         SHIFT = 5
         CTRL = 6
         HOME = 7
         END = 8
+        DELETE = 9
         ARROW_UP = 10
         ARROW_DOWN = 11
         ARROW_LEFT = 12
@@ -114,11 +115,12 @@ class Key:
         Special.ENTER: '↵',
         Special.BACKSPACE: '⌫',
         Special.TAB: '↹',
-        Special.ESC: '⎋',
+        Special.ESCAPE: '⎋',
         Special.SHIFT: '⇧',
         Special.CTRL: '⌃',
         Special.HOME: '↖',
         Special.END: '↘',
+        Special.DELETE: '⌦',
         Special.ARROW_UP: '↑',
         Special.ARROW_DOWN: '↓',
         Special.ARROW_LEFT: '←',
@@ -282,7 +284,7 @@ class Term:
             if b == b'\t':
                 return Key(Key.Special.TAB)
             if b == b'\x1b':
-                return Key(Key.Special.ESC)
+                return Key(Key.Special.ESCAPE)
             if b == b'\xe0':
                 b = msvcrt.getch()
                 if b == b'H':
@@ -293,12 +295,20 @@ class Term:
                     return Key(Key.Special.ARROW_LEFT)
                 if b == b'M':
                     return Key(Key.Special.ARROW_RIGHT)
+                if b == b'G':
+                    return Key(Key.Special.HOME)
+                if b == b'O':
+                    return Key(Key.Special.END)
+                if b == b'S':
+                    return Key(Key.Special.DELETE)
+                return Key('xe0-' + str(b)[2:-1])
             if b == b'\x00':
                 b = msvcrt.getch()
                 if b == b'G':
                     return Key(Key.Special.HOME)
                 if b == b'O':
                     return Key(Key.Special.END)
+                return Key('x00-' + str(b)[2:-1])
             return Key(str(b)[2:-1])
         else:
             b = os.read(0, 1)
@@ -446,7 +456,8 @@ def menu_handle(k: Key):
     else:
         State.parameter = (Style.RED + 'Unknown: ' +
                            Style.BRIGHT_BLACK + '[' +
-                           Style.DEFAULT + k.force_str() + (' ' if k in (k.Special.BACKSPACE,) else '') +
+                           Style.DEFAULT + k.force_str() +
+                           (' ' if k in (k.Special.BACKSPACE, k.Special.DELETE) else '') +
                            Style.BRIGHT_BLACK + ']' +
                            Style.DEFAULT)
         state_change = False
@@ -646,7 +657,7 @@ def edit_print():
 
 
 def edit_handle(k: Key):
-    if k == '/':
+    if k == '/' or k == k.Special.ESCAPE:
         del State.parameter['mod']
         del State.parameter['cursor']
         State.state = State.Enum.EXPLORE
@@ -676,6 +687,10 @@ def edit_handle(k: Key):
             cursor = State.parameter['cursor']
             State.parameter['mod'] = State.parameter['mod'][:cursor - 1] + State.parameter['mod'][cursor:]
             State.parameter['cursor'] -= 1
+    elif k == Key.Special.DELETE:
+        if State.parameter['mod']:
+            cursor = State.parameter['cursor']
+            State.parameter['mod'] = State.parameter['mod'][:cursor] + State.parameter['mod'][cursor + 1:]
     elif k == Key.Special.ARROW_LEFT:
         if State.parameter['cursor'] > 0:
             if ' - ' in State.parameter['mod'] and State.parameter['mod'].index(' - ') == State.parameter['cursor'] - 3:
