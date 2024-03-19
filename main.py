@@ -547,9 +547,10 @@ def explore_print():
 
     for i in range(len(State.parameter['filtered'])):
         bullet_color = Style.GREEN if i == State.parameter['selection'] else Style.BRIGHT_BLACK
-        line = (f'{bullet_color}  • {Style.DEFAULT}{State.parameter["filtered"][i][0]}'
+        line = (f'  {bullet_color}•{Style.DEFAULT} {State.parameter["filtered"][i][0]}'
                 ' - '
-                f'{State.parameter["filtered"][i][1].translation}')
+                f'{State.parameter["filtered"][i][1].translation}'
+                f' {Style.BRIGHT_BLACK}[{State.parameter["filtered"][i][1].rate}]')
         if i == State.parameter['selection']:
             line = Style.from_hex('#333', True) + line + ' ' + Style.DEFAULT_BG
         Term.insert(line, -5 - i)
