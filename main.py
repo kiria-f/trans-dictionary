@@ -822,11 +822,18 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        Term.clear()
-        print(Style.RED + 'Error: \n' + Style.BRIGHT_BLACK)
-        traceback.print_exception(e)
-        print(Style.DEFAULT + '\nPress any key to exit...')
-        Term.getch()
+    run = True
+    while run:
+        try:
+            main()
+            run = False
+        except Exception as e:
+            Term.clear()
+            print(Style.RED + 'Error: \n' + Style.BRIGHT_BLACK)
+            traceback.print_exception(e)
+            print(Style.DEFAULT + '\nDo you want to restart the application? [Y/n]', end=' ')
+            key = Key.Special.ESCAPE
+            while key not in ('y', 'n', Key.Special.ENTER):
+                key = Term.getch()
+                if key == 'n':
+                    run = False
