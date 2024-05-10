@@ -468,7 +468,7 @@ def menu_handle(k: Key):
         state_change = False
     elif k == 's':
         if State.parameter == 'Settings are not implemented yet':
-            State.parameter = ['Contact me in Tg @Kiria_F', 'and tell me what do you want']
+            State.parameter = ['Contact me on Tg @Kiria_F', 'and tell me what do you want']
         else:
             State.parameter = 'Settings are not implemented yet'
         state_change = False
