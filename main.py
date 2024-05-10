@@ -451,6 +451,12 @@ def menu_handle(k: Key):
     elif k == 'r':
         Term.refresh()
         state_change = False
+    elif k == 's':
+        if State.parameter == 'Settings are not implemented yet':
+            State.parameter = 'Contact me in Tg @Kiria_F and tell me what do you want'
+        else:
+            State.parameter = 'Settings are not implemented yet'
+        state_change = False
     elif k == 'q':
         State.state = State.Enum.QUIT
     else:
