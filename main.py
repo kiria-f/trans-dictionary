@@ -823,7 +823,7 @@ def main():
     State.state = State.Enum.MENU
     State.next_call = lambda: menu_print()
     Term.reset()
-    State.parameter = f'Hi, here are {len(DB.data)} words saved!'
+    State.parameter = f'Hi, here are {Style.YELLOW}{len(DB.data)}{Style.DEFAULT} words saved!'
     while State.state != State.Enum.QUIT:
         logic[State.state].printer()
         Term.draw()
