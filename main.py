@@ -236,6 +236,15 @@ class Term:
 
     @staticmethod
     def _prepare_text(text: insertion_any_form) -> list[tuple[str, int]]:
+        """
+        Prepare text input for processing by converting it into a list of tuples
+        with each tuple containing a string and its visible length.
+        Parameters:
+            text (insertion_any_form): The input text to be processed.
+        Returns:
+            list[tuple[str, int]]: A list of tuples where each tuple contains a
+            string and its visible length.
+        """
         if isinstance(text, str):
             return [(text, StrTool.visible_len(text))]
         if isinstance(text, tuple) and len(text) == 2 and isinstance(text[1], int):
@@ -251,12 +260,18 @@ class Term:
         return []
 
     @staticmethod
-    def insert(text: insertion_any_form, y: int | None = None, align_center: bool = False) -> None:
+    def insert(
+            text: insertion_any_form,
+            y: int | None = None,
+            align_center: bool = False,
+            bottom_anchor: bool = False) -> None:
         text = Term._prepare_text(text)
         if y is None:
             y = (Term.in_height - len(text)) // 2 + 1
         if y < 0:
             y = Term.in_height + y
+        if bottom_anchor:
+            y -= len(text) - 1
         y += 1
         for i in range(len(text)):
             line = text[i][0]
@@ -436,7 +451,7 @@ def menu_print():
     if State.parameter is None:
         Term.insert(f'{Style.GREEN}[/]{Style.DEFAULT} Back to menu from anywhere', -2, True)
     elif State.parameter:
-        Term.insert(State.parameter, -2, True)
+        Term.insert(State.parameter, -2, True, True)
 
 
 def menu_handle(k: Key):
@@ -453,7 +468,7 @@ def menu_handle(k: Key):
         state_change = False
     elif k == 's':
         if State.parameter == 'Settings are not implemented yet':
-            State.parameter = 'Contact me in Tg @Kiria_F and tell me what do you want'
+            State.parameter = ['Contact me in Tg @Kiria_F', 'and tell me what do you want']
         else:
             State.parameter = 'Settings are not implemented yet'
         state_change = False
@@ -808,6 +823,7 @@ def main():
     State.state = State.Enum.MENU
     State.next_call = lambda: menu_print()
     Term.reset()
+    State.parameter = f'Hi, here are {len(DB.data)} words saved!'
     while State.state != State.Enum.QUIT:
         logic[State.state].printer()
         Term.draw()
