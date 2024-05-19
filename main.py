@@ -1,9 +1,14 @@
+import sys
 import os
 import json
 from dataclasses import dataclass
 import random
 from typing import NewType, Union, Any
-import msvcrt
+if os.name == 'nt':
+    import msvcrt
+else:
+    import termios
+    import tty
 import traceback
 
 DEBUG = False
@@ -325,8 +330,11 @@ class Term:
                 return Key('x00-' + str(b)[2:-1])
             return Key(str(b)[2:-1])
         else:
-            b = os.read(0, 1)
-            return Key(str(b)[2:-1])
+            
+            old_settings = termios.tcgetattr(sys.stdin)
+            tty.setcbreak(sys.stdin.fileno())
+            b = os.read(sys.stdin.fileno(), 3).decode()
+            return Key(str(b))
 
 
 class Style:
@@ -852,3 +860,4 @@ if __name__ == '__main__':
                 key = Term.getch()
                 if key == 'n':
                     run = False
+    print(Style.RESET, Style.BLINK_ON, sep='', end='')
