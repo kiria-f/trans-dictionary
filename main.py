@@ -172,16 +172,31 @@ class RecordEncoder(json.JSONEncoder):
 
 class DB:
     data: dict[str, Record] = {}
+    init_size: int
 
     @staticmethod
-    def load() -> None:
-        with open('db.json', 'r', encoding='utf-8') as db_file:
-            db_raw = json.load(db_file)
-        DB.data = {k: Record(v['translation'], v['rate']) for k, v in db_raw.items()}
+    def load(config: dict[str, str] = None) -> bool:
+        try:
+            if config is None:
+                with open('config.json', 'r', encoding='utf-8') as config_file:
+                    config = json.load(config_file)
+            with open(config['db-path'], 'r', encoding='utf-8') as db_file:
+                db_raw = json.load(db_file)
+            DB.data = {k: Record(v['translation'], v['rate']) for k, v in db_raw.items()}
+            DB.init_size = len(DB.data)
+        except FileNotFoundError:
+            return False
+        return True
 
     @staticmethod
-    def dump() -> None:
-        with open('db.json', 'w', encoding='utf-8') as db_file:
+    def save(config: dict[str, str] = None) -> None:
+        if config is None:
+            with open('config.json', 'r', encoding='utf-8') as config_file:
+                config = json.load(config_file)
+        if len(DB.data) >= DB.init_size:
+            with open(config['db-path'] + '.bak', 'w', encoding='utf-8') as db_file_backup:
+                json.dump(DB.data, db_file_backup, cls=RecordEncoder, ensure_ascii=False, indent=4)
+        with open(config['db-path'], 'w', encoding='utf-8') as db_file:
             json.dump(DB.data, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
 
 
@@ -193,7 +208,7 @@ class Term:
     hide_cursor_code = '\033[?25l'
     show_cursor_code = '\033[?25h'
 
-    width, height = os.get_terminal_size()
+    width, height = (80, 25) if DEBUG else os.get_terminal_size()
     in_width, in_height = width - 2, height - 2
     buffer = [' ' * width] * height
     cursor: tuple[int, int] | None = None
@@ -526,7 +541,7 @@ def add_handle(k: Key):
             key, val = State.parameter.split(' - ', 1)
             val = Record(val)
             DB.data[key] = val
-            DB.dump()
+            DB.save()
             phrase = Style.BRIGHT_BLUE + State.parameter[:State.parameter.index(" - ")] + Style.DEFAULT
             State.parameter = f'Phrase {phrase} is successfully added'
         else:
@@ -629,7 +644,7 @@ def explore_handle(k: Key):
         if k == 'd':
             del DB.data[State.parameter['filtered'][State.parameter['selection']][0]]
             update_filtered = True
-            DB.dump()
+            DB.save()
         elif k == 'e':
             State.state = State.Enum.EDIT
         elif k == 'r':
@@ -685,7 +700,7 @@ def edit_handle(k: Key):
         old_val = DB.data.pop(State.parameter['filtered'][State.parameter['selection']][0])
         kvp = State.parameter['mod'].split(' - ', 1)
         DB.data[kvp[0]] = Record(kvp[1], old_val.rate)
-        DB.dump()
+        DB.save()
 
         if State.parameter['promt']:
             State.parameter['filtered'] = sorted(
@@ -797,18 +812,51 @@ def scroll_handle(k: Key):
         else:
             if State.parameter['record']:
                 State.parameter['record'].rate *= 0.75
-                DB.dump()
+                DB.save()
             get_new_phrase()
     elif k == "'":
         if State.parameter['reveal'] and State.parameter['record']:
             State.parameter['record'].rate *= 1.25
-            DB.dump()
+            DB.save()
             State.parameter['reveal'] = True
             get_new_phrase()
 
 
 def main():
-    DB.load()
+    # Setup config
+    try:
+        with open('config.json', 'r', encoding='utf-8') as config_file:
+            config = json.load(config_file)
+    except FileNotFoundError:
+        Term.clear()
+        print(Style.BOLD + Style.YELLOW + 'Hello!\n' + Style.DEFAULT)
+        print('Config file was not found.' +
+              Style.BRIGHT_BLACK + ' (it\'s ok, if it\'s the first launch)',
+              Style.DEFAULT + 'Creating a new one...',
+              sep='\n')
+        config = {}
+
+    ok = False
+
+    # Setup database
+    create_new_db = False
+    while not ok:
+        if 'db-path' not in config:
+            create_new_db = input('Do you want to create a new database? [y/N] ') == 'y'
+            config['db-path'] = input('Database filepath: ')
+        if create_new_db:
+            with open(config['db-path'], 'w', encoding='utf-8') as db_file:
+                json.dump({}, db_file, cls=RecordEncoder, ensure_ascii=False, indent=4)
+        ok = DB.load(config)
+        if not ok:
+            print(Style.RED + 'Database not found.' + Style.DEFAULT)
+            del config['db-path']
+
+    # Save config
+    with open('config.json', 'w', encoding='utf-8') as config_file:
+        json.dump(config, config_file, ensure_ascii=False, indent=4)
+
+    # Load app logic
     if not DEBUG:
         Term.clear()
     logic = {
@@ -819,6 +867,8 @@ def main():
         State.Enum.SCROLL: LogicBlock(scroll_print, scroll_handle)
     }
 
+    # Run app
+    DB.load()
     State.state = State.Enum.MENU
     State.next_call = lambda: menu_print()
     Term.reset()
