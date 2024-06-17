@@ -494,6 +494,9 @@ def menu_handle(k: Key):
         else:
             State.parameter = 'Settings are not implemented yet'
         state_change = False
+    elif k == '/':
+        State.parameter = 'Press ' + Style.RED + '[Q]' + Style.DEFAULT + ' to quit'
+        state_change = False
     elif k == 'q':
         State.state = State.Enum.QUIT
     else:
