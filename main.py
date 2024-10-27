@@ -471,7 +471,7 @@ class LogicBlock:
 def menu_print():
     Term.insert(MENU, align_center=True)
     if State.parameter is None:
-        Term.insert(f'{Style.GREEN}[/]{Style.DEFAULT} Back to menu from anywhere', -2, True)
+        Term.insert(f'{Style.GREEN}[ESC]{Style.DEFAULT} Back to menu from anywhere', -2, True)
     elif State.parameter:
         Term.insert(State.parameter, -2, True, True)
 
@@ -494,7 +494,7 @@ def menu_handle(k: Key):
         else:
             State.parameter = 'Settings are not implemented yet'
         state_change = False
-    elif k == '/':
+    elif k == Key.Special.ESCAPE:
         State.parameter = 'Press ' + Style.RED + '[Q]' + Style.DEFAULT + ' to quit'
         state_change = False
     elif k == 'q':
@@ -544,7 +544,7 @@ def add_print():
 
 
 def add_handle(k: Key):
-    if k == '/':
+    if k == Key.Special.ESCAPE:
         State.state = State.Enum.MENU
         State.parameter = None
     elif k == Key.Special.ENTER:
@@ -626,7 +626,7 @@ def explore_print():
 
 def explore_handle(k: Key):
     update_filtered = False
-    if k == '/':
+    if k == Key.Special.ESCAPE:
         State.state = State.Enum.MENU
         State.parameter = None
     elif k == Key.Special.ARROW_UP:
@@ -703,7 +703,7 @@ def edit_print():
 
 
 def edit_handle(k: Key):
-    if k == '/' or k == k.Special.ESCAPE:
+    if k == Key.Special.ESCAPE:
         del State.parameter['mod']
         del State.parameter['cursor']
         State.state = State.Enum.EXPLORE
@@ -814,7 +814,7 @@ def get_new_phrase():
 
 
 def scroll_handle(k: Key):
-    if k == '/':
+    if k == Key.Special.ESCAPE:
         State.state = State.Enum.MENU
         State.parameter = None
     elif k == Key.Special.ENTER:
