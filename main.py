@@ -1,9 +1,10 @@
-import sys
-import os
 import json
-from dataclasses import dataclass
+import os
 import random
-from typing import NewType, Union, Any
+import sys
+from dataclasses import dataclass
+from typing import Any, NewType, Union, TypeAlias
+
 if os.name == 'nt':
     import msvcrt
 else:
@@ -13,13 +14,14 @@ import traceback
 
 DEBUG = False
 
-insertion_any_form = NewType('insertion_any_form', Union[
+InsertionAnyForm: TypeAlias = Union[
     str,
     tuple[str, int],
     tuple[str, ...],
     list[str],
     tuple[tuple[str, int], ...],
-    list[tuple[str, int]]])
+    list[tuple[str, int]],
+]
 
 insertion = NewType('insertion', list[tuple[str, int]])
 
@@ -57,17 +59,9 @@ class StrTool:
         return vi - 1
 
     @staticmethod
-    def format(
-            line: str,
-            final: bool = False,
-            colorize: bool = False,
-            palette: dict[str, str] | None = None) -> str:
+    def format(line: str, final: bool = False, colorize: bool = False, palette: dict[str, str] | None = None) -> str:
         if palette is None:
-            palette = {
-                'phrase': Style.BRIGHT_BLUE,
-                'delim': Style.DEFAULT,
-                'translation': Style.GREEN
-            }
+            palette = {'phrase': Style.BRIGHT_BLUE, 'delim': Style.DEFAULT, 'translation': Style.GREEN}
         line = line.lower()
         deline = line.split()
         if len(deline) > 0:
@@ -237,12 +231,14 @@ class Term:
 
     @staticmethod
     def draw() -> None:
-        print('' if DEBUG else Term.reset_pos_code,
-              '\n'.join(Term.buffer),
-              Term.hide_cursor_code if Term.cursor is None else (
-                      Term.show_cursor_code +
-                      f'\033[{Term.cursor[0]};{Term.cursor[1]}H'),
-              sep='', end='', flush=True)
+        print(
+            '' if DEBUG else Term.reset_pos_code,
+            '\n'.join(Term.buffer),
+            Term.hide_cursor_code if Term.cursor is None else (Term.show_cursor_code + f'\033[{Term.cursor[0]};{Term.cursor[1]}H'),
+            sep='',
+            end='',
+            flush=True,
+        )
         Term.cursor = None
 
     @staticmethod
@@ -254,12 +250,12 @@ class Term:
         Term.cursor = (y + 1, x + 1)
 
     @staticmethod
-    def _prepare_text(text: insertion_any_form) -> list[tuple[str, int]]:
+    def _prepare_text(text: InsertionAnyForm) -> list[tuple[str, int]]:
         """
         Prepare text input for processing by converting it into a list of tuples
         with each tuple containing a string and its visible length.
         Parameters:
-            text (insertion_any_form): The input text to be processed.
+            text (InsertionAnyForm): The input text to be processed.
         Returns:
             list[tuple[str, int]]: A list of tuples where each tuple contains a
             string and its visible length.
@@ -279,11 +275,7 @@ class Term:
         return []
 
     @staticmethod
-    def insert(
-            text: insertion_any_form,
-            y: int | None = None,
-            align_center: bool = False,
-            bottom_anchor: bool = False) -> None:
+    def insert(text: InsertionAnyForm, y: int | None = None, align_center: bool = False, bottom_anchor: bool = False) -> None:
         text = Term._prepare_text(text)
         if y is None:
             y = (Term.in_height - len(text)) // 2 + 1
@@ -302,7 +294,7 @@ class Term:
                 line += ' ' * (Term.in_width - line_width)
             v_len = StrTool.visible_len(line)
             if v_len > Term.in_width:
-                line = line[:StrTool.visible_index(line, Term.in_width)] + '…'
+                line = line[: StrTool.visible_index(line, Term.in_width)] + '…'
             Term.buffer[y + i] = '│' + line + '│'
 
     @staticmethod
@@ -345,7 +337,6 @@ class Term:
                 return Key('x00-' + str(b)[2:-1])
             return Key(str(b)[2:-1])
         else:
-            
             old_settings = termios.tcgetattr(sys.stdin)
             tty.setcbreak(sys.stdin.fileno())
             b = os.read(sys.stdin.fileno(), 3).decode()
@@ -500,12 +491,18 @@ def menu_handle(k: Key):
     elif k == 'q':
         State.state = State.Enum.QUIT
     else:
-        State.parameter = (Style.RED + 'Unknown: ' +
-                           Style.BRIGHT_BLACK + '[' +
-                           Style.DEFAULT + k.force_str() +
-                           (' ' if k in (k.Special.BACKSPACE, k.Special.DELETE) else '') +
-                           Style.BRIGHT_BLACK + ']' +
-                           Style.DEFAULT)
+        State.parameter = (
+            Style.RED
+            + 'Unknown: '
+            + Style.BRIGHT_BLACK
+            + '['
+            + Style.DEFAULT
+            + k.force_str()
+            + (' ' if k in (k.Special.BACKSPACE, k.Special.DELETE) else '')
+            + Style.BRIGHT_BLACK
+            + ']'
+            + Style.DEFAULT
+        )
         state_change = False
 
     if state_change:
@@ -517,14 +514,14 @@ def add_print():
         State.parameter = ''
 
     Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter, y=-3)
-    tip = 'Phrase'[:len(State.parameter)]
+    tip = 'Phrase'[: len(State.parameter)]
     if ' - ' in State.parameter:
         dash_index = State.parameter.index(' - ')
         if dash_index < 6:
             tip = tip[:dash_index] + '…  '
         else:
             tip += ' ' * (dash_index - 3)
-        tip += Style.GREEN + 'Перевод'[:len(State.parameter) - dash_index - 3]
+        tip += Style.GREEN + 'Перевод'[: len(State.parameter) - dash_index - 3]
         if len(State.parameter) - dash_index - 3 < 7:
             tip += '…'
     else:
@@ -535,11 +532,10 @@ def add_print():
     if State.parameter != '':
         token = State.parameter.lower()
         if ' - ' in token:
-            token = token[:token.index(' - ')]
+            token = token[: token.index(' - ')]
         filtered = sorted(filter(lambda item: token in item[0].lower(), DB.data.items()), reverse=True)[:9]
         for i in range(len(filtered)):
-            Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} '
-                        + filtered[i][0] + ' - ' + filtered[i][1].translation, -5 - i)
+            Term.insert(f'{Style.BRIGHT_BLACK}  >{Style.DEFAULT} ' + filtered[i][0] + ' - ' + filtered[i][1].translation, -5 - i)
     Term.set_cursor(-2, len(State.parameter) + 5)
 
 
@@ -553,7 +549,7 @@ def add_handle(k: Key):
             val = Record(val)
             DB.data[key] = val
             DB.save()
-            phrase = Style.BRIGHT_BLUE + State.parameter[:State.parameter.index(" - ")] + Style.DEFAULT
+            phrase = Style.BRIGHT_BLUE + State.parameter[: State.parameter.index(' - ')] + Style.DEFAULT
             State.parameter = f'Phrase {phrase} is successfully added'
         else:
             State.parameter = Style.RED + 'Phrase is not added' + Style.DEFAULT
@@ -591,11 +587,7 @@ def add_handle(k: Key):
 def explore_print():
     first_time = State.parameter is None
     if first_time:
-        State.parameter = {
-            'promt': '',
-            'filtered': [],
-            'selection': -1
-        }
+        State.parameter = {'promt': '', 'filtered': [], 'selection': -1}
 
     Term.insert(Style.BLINK_ON + '  ⮞ ' + Style.BLINK_OFF + State.parameter['promt'], y=-3)
     if State.scroll_mode == State.Direction.STRAIGHT:
@@ -606,20 +598,22 @@ def explore_print():
 
     for i in range(len(State.parameter['filtered'])):
         bullet_color = Style.GREEN if i == State.parameter['selection'] else Style.BRIGHT_BLACK
-        line = (f'  {bullet_color}•{Style.DEFAULT} {State.parameter["filtered"][i][0]}'
-                ' - '
-                f'{State.parameter["filtered"][i][1].translation}'
-                f' {Style.BRIGHT_BLACK}[{State.parameter["filtered"][i][1].rate}]'
-                f' {Style.DEFAULT}')
+        line = (
+            f'  {bullet_color}•{Style.DEFAULT} {State.parameter["filtered"][i][0]}'
+            ' - '
+            f'{State.parameter["filtered"][i][1].translation}'
+            f' {Style.BRIGHT_BLACK}[{State.parameter["filtered"][i][1].rate}]'
+            f' {Style.DEFAULT}'
+        )
         if i == State.parameter['selection']:
             line = Style.from_hex('#333', True) + line + ' ' + Style.DEFAULT_BG
         Term.insert(line, -5 - i)
 
     if first_time:
-        Term.insert('    '
-                    f'{Style.RED}[D]{Style.DEFAULT}elete, '
-                    f'{Style.GREEN}[E]{Style.DEFAULT}dit, '
-                    f'{Style.GREEN}[R]{Style.DEFAULT}eset selection', -5)
+        Term.insert(
+            f'    {Style.RED}[D]{Style.DEFAULT}elete, {Style.GREEN}[E]{Style.DEFAULT}dit, {Style.GREEN}[R]{Style.DEFAULT}eset selection',
+            -5,
+        )
     elif State.parameter['selection'] == -1:
         Term.set_cursor(-2, len(State.parameter['promt']) + 5)
 
@@ -665,8 +659,10 @@ def explore_handle(k: Key):
             State.parameter['filtered'] = sorted(
                 filter(
                     lambda s: State.parameter['promt'].lower() in s[0].lower() + s[1].translation.lower(),
-                    DB.data.items()),
-                reverse=True)[:Term.in_height - 5]
+                    DB.data.items(),
+                ),
+                reverse=True,
+            )[: Term.in_height - 5]
         else:
             State.parameter['filtered'] = []
             State.parameter['selection'] = -1
@@ -692,10 +688,11 @@ def edit_print():
         if State.parameter['selection'] == i:
             line = '  • ' + StrTool.format(State.parameter['mod'], colorize=True)
         else:
-            line = Style.BRIGHT_BLACK + '  • ' + StrTool.format(
-                State.parameter["filtered"][i][0] +
-                ' - ' +
-                State.parameter["filtered"][i][1].translation + Style.DEFAULT)
+            line = (
+                Style.BRIGHT_BLACK
+                + '  • '
+                + StrTool.format(State.parameter['filtered'][i][0] + ' - ' + State.parameter['filtered'][i][1].translation + Style.DEFAULT)
+            )
         Term.insert(line, -5 - i)
 
     cursor = State.parameter['cursor']
@@ -717,8 +714,10 @@ def edit_handle(k: Key):
             State.parameter['filtered'] = sorted(
                 filter(
                     lambda s: State.parameter['promt'].lower() in s[0].lower() + s[1].translation.lower(),
-                    DB.data.items()),
-                reverse=True)[:Term.in_height - 5]
+                    DB.data.items(),
+                ),
+                reverse=True,
+            )[: Term.in_height - 5]
         else:
             State.parameter['filtered'] = []
             State.parameter['selection'] = -1
@@ -731,12 +730,12 @@ def edit_handle(k: Key):
     elif k == Key.Special.BACKSPACE:
         if State.parameter['mod']:
             cursor = State.parameter['cursor']
-            State.parameter['mod'] = State.parameter['mod'][:cursor - 1] + State.parameter['mod'][cursor:]
+            State.parameter['mod'] = State.parameter['mod'][: cursor - 1] + State.parameter['mod'][cursor:]
             State.parameter['cursor'] -= 1
     elif k == Key.Special.DELETE:
         if State.parameter['mod']:
             cursor = State.parameter['cursor']
-            State.parameter['mod'] = State.parameter['mod'][:cursor] + State.parameter['mod'][cursor + 1:]
+            State.parameter['mod'] = State.parameter['mod'][:cursor] + State.parameter['mod'][cursor + 1 :]
     elif k == Key.Special.ARROW_LEFT:
         if State.parameter['cursor'] > 0:
             if ' - ' in State.parameter['mod'] and State.parameter['mod'].index(' - ') == State.parameter['cursor'] - 3:
@@ -766,29 +765,20 @@ def edit_handle(k: Key):
             c = en2ru[k] if k in en2ru else str(k)
         else:
             c = str(k)
-        State.parameter['mod'] = (
-                State.parameter['mod'][:State.parameter['cursor'] - replace_prev] +
-                c +
-                State.parameter['mod'][State.parameter['cursor']:])
+        State.parameter['mod'] = State.parameter['mod'][: State.parameter['cursor'] - replace_prev] + c + State.parameter['mod'][State.parameter['cursor'] :]
         State.parameter['cursor'] += len(c) - replace_prev
 
 
 def scroll_print():
     first_time = State.parameter is None
     if first_time or not State.parameter['record']:
-        State.parameter = {
-            'phrase': '',
-            'record': None,
-            'reveal': False
-        }
+        State.parameter = {'phrase': '', 'record': None, 'reveal': False}
         Term.insert(
             f'{Style.GREEN}[Enter]{Style.DEFAULT} Show translation / Correct / Scroll next',
             Term.in_height // 2 - 1,
-            True)
-        Term.insert(
-            f'{Style.GREEN}[\']{Style.DEFAULT} Incorrect',
-            Term.in_height // 2 + 1,
-            True)
+            True,
+        )
+        Term.insert(f"{Style.GREEN}[']{Style.DEFAULT} Incorrect", Term.in_height // 2 + 1, True)
         return
 
     Term.insert(State.parameter['phrase'], Term.in_height // 2, True)
@@ -806,11 +796,7 @@ def get_new_phrase():
         if rnd < item[1].rate:
             break
         rnd -= item[1].rate
-    State.parameter = {
-        'phrase': item[0],
-        'record': item[1],
-        'reveal': False
-    }
+    State.parameter = {'phrase': item[0], 'record': item[1], 'reveal': False}
 
 
 def scroll_handle(k: Key):
@@ -841,10 +827,11 @@ def main():
     except FileNotFoundError:
         Term.clear()
         print(Style.BOLD + Style.YELLOW + 'Hello!\n' + Style.DEFAULT)
-        print('Config file was not found.' +
-              Style.BRIGHT_BLACK + ' (it\'s ok, if it\'s the first launch)',
-              Style.DEFAULT + 'Creating a new one...',
-              sep='\n')
+        print(
+            'Config file was not found.' + Style.BRIGHT_BLACK + " (it's ok, if it's the first launch)",
+            Style.DEFAULT + 'Creating a new one...',
+            sep='\n',
+        )
         config = {}
 
     ok = False
@@ -875,7 +862,7 @@ def main():
         State.Enum.ADD: LogicBlock(add_print, add_handle),
         State.Enum.EXPLORE: LogicBlock(explore_print, explore_handle),
         State.Enum.EDIT: LogicBlock(edit_print, edit_handle),
-        State.Enum.SCROLL: LogicBlock(scroll_print, scroll_handle)
+        State.Enum.SCROLL: LogicBlock(scroll_print, scroll_handle),
     }
 
     # Run app
